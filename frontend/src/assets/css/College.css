@@ -1,0 +1,62 @@
+/* College Finder Styles */
+
+.college-finder-page {
+  min-height: 100vh;
+  background: #f8f9fa;
+}
+
+.college-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.bg-gradient-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.college-card {
+  transition: all 0.3s ease;
+  border: none;
+  border-radius: 12px;
+}
+
+.college-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
+}
+
+.rating-badge {
+  text-align: center;
+  min-width: 60px;
+}
+
+.info-box {
+  height: 100%;
+  transition: all 0.2s ease;
+}
+
+.info-box:hover {
+  transform: scale(1.05);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .college-header h1 {
+    font-size: 2rem;
+  }
+  
+  .college-card {
+    margin-bottom: 1rem;
+  }
+}
+
+/* Badge spacing */
+.badge {
+  font-weight: 500;
+}
+
+/* Form labels */
+.form-label {
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
