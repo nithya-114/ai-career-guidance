@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
-// Components - All using default imports
+// Components
 import NavigationBar from './components/Navbar';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -13,6 +13,7 @@ import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import Chatbot from './components/Chatbot/Chatbot';
 import RegisterCounsellor from './pages/RegisterCounsellor';
+import AdminLogin from './pages/AdminLogin';
 import CareerListing from './pages/CareerListing';
 import CareerDetails from './pages/CareerDetails';
 import Quiz from './pages/Quiz';
@@ -62,6 +63,50 @@ const PublicRoute = ({ children }) => {
   return children;
 };
 
+// Home Route Component
+const HomeRoute = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (user) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <Home />;
+};
+
+// Admin Route Component (only for admins)
+const AdminRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+        <div className="spinner-border text-primary"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/admin-login" replace />;
+  }
+
+  if (user.role !== 'admin') {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+};
+
 // 404 Not Found Component
 const NotFound = () => (
   <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '80vh' }}>
@@ -78,9 +123,10 @@ function AppContent() {
       <div className="App">
         <NavigationBar />
         <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<Home />} />
+          {/* Home Route */}
+          <Route path="/" element={<HomeRoute />} />
           
+          {/* Public Routes */}
           <Route 
             path="/login" 
             element={
@@ -104,6 +150,16 @@ function AppContent() {
             element={
               <PublicRoute>
                 <RegisterCounsellor />
+              </PublicRoute>
+            } 
+          />
+
+          {/* Admin Login Route */}
+          <Route 
+            path="/admin-login"
+            element={
+              <PublicRoute>
+                <AdminLogin />
               </PublicRoute>
             } 
           />
@@ -136,11 +192,6 @@ function AppContent() {
             }
           />
 
-          {/* Career Routes */}
-          <Route path="/careers" element={<CareerListing />} />
-          <Route path="/careers/:id" element={<CareerDetails />} />
-          
-          {/* Quiz & Recommendations */}
           <Route 
             path="/quiz" 
             element={
@@ -158,11 +209,11 @@ function AppContent() {
               </ProtectedRoute>
             } 
           />
-          
-          {/* College Finder */}
+
+          {/* Public Career & College Routes */}
+          <Route path="/careers" element={<CareerListing />} />
+          <Route path="/careers/:id" element={<CareerDetails />} />
           <Route path="/colleges" element={<CollegeFinder />} />
-          
-          {/* Counsellors */}
           <Route path="/counsellors" element={<CounsellorDirectory />} />
           
           {/* 404 Route */}

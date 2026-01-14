@@ -1,260 +1,172 @@
-import React, { useState } from 'react';
-import { Container, Row, Col, Card, Form, Button, Alert, Badge } from 'react-bootstrap';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaSave, FaEdit } from 'react-icons/fa';
-import '../assets/css/Profile.css';
+import axios from 'axios';
 
-const Profile = () => {
-  const { user, updateUserProfile } = useAuth();
-  const [isEditing, setIsEditing] = useState(false);
-  const [message, setMessage] = useState({ type: '', text: '' });
-  const [formData, setFormData] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
-    phone: user?.profile?.phone || '',
-    location: user?.profile?.location || '',
-    education: user?.profile?.education || '',
-    interests: user?.profile?.interests || '',
-    goals: user?.profile?.goals || '',
-  });
+function Profile() {
+  const { user } = useAuth();
+  const [profileData, setProfileData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [editMode, setEditMode] = useState(false);
+  const [formData, setFormData] = useState({});
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setMessage({ type: '', text: '' });
+  useEffect(() => {
+    fetchProfile();
+  }, []);
 
-    const result = await updateUserProfile({
-      phone: formData.phone,
-      location: formData.location,
-      education: formData.education,
-      interests: formData.interests,
-      goals: formData.goals,
-    });
+  const fetchProfile = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/user/profile`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-    if (result.success) {
-      setMessage({ type: 'success', text: 'Profile updated successfully!' });
-      setIsEditing(false);
-    } else {
-      setMessage({ type: 'danger', text: result.error });
+      console.log('Profile data received:', response.data);
+      setProfileData(response.data);
+      setFormData(response.data);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      setLoading(false);
     }
   };
 
-  const calculateProfileCompletion = () => {
-    const fields = [formData.name, formData.email, formData.phone, formData.location, formData.education, formData.interests, formData.goals];
-    const filledFields = fields.filter(field => field && field.trim() !== '').length;
-    return Math.round((filledFields / fields.length) * 100);
+  const getRoleBadgeClass = () => {
+    const role = profileData?.role || user?.role || 'student';
+    switch(role) {
+      case 'counsellor': return 'bg-success';
+      case 'admin': return 'bg-danger';
+      default: return 'bg-primary';
+    }
   };
 
-  const profileCompletion = calculateProfileCompletion();
+  const getRoleDisplay = () => {
+    const role = profileData?.role || user?.role || 'student';
+    return role.charAt(0).toUpperCase() + role.slice(1);
+  };
+
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '80vh' }}>
+        <div className="spinner-border text-primary"></div>
+      </div>
+    );
+  }
+
+  const role = profileData?.role || user?.role || 'student';
 
   return (
-    <div className="profile-page">
-      <Container className="py-5">
-        <Row className="justify-content-center">
-          <Col lg={8}>
-            {/* Profile Header */}
-            <Card className="mb-4 border-0 shadow-sm">
-              <Card.Body className="p-4">
-                <div className="d-flex align-items-center justify-content-between">
+    <div className="container py-5">
+      <div className="row justify-content-center">
+        <div className="col-lg-10">
+          {/* Header Card */}
+          <div className="card shadow-sm mb-4">
+            <div className="card-body p-4">
+              <div className="row align-items-center">
+                <div className="col-md-8">
                   <div className="d-flex align-items-center">
-                    <div className="profile-avatar me-3">
-                      <FaUser size={50} className="text-white" />
-                    </div>
-                    <div>
-                      <h3 className="mb-1">{user?.name}</h3>
-                      <p className="text-muted mb-0">{user?.email}</p>
-                      <Badge bg="primary" className="mt-2">
-                        Student
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="text-end">
-                    <div className="profile-completion mb-2">
-                      <div className="completion-circle">
-                        <svg viewBox="0 0 36 36" className="circular-chart">
-                          <path className="circle-bg"
-                            d="M18 2.0845
-                              a 15.9155 15.9155 0 0 1 0 31.831
-                              a 15.9155 15.9155 0 0 1 0 -31.831"
-                          />
-                          <path className="circle"
-                            strokeDasharray={`${profileCompletion}, 100`}
-                            d="M18 2.0845
-                              a 15.9155 15.9155 0 0 1 0 31.831
-                              a 15.9155 15.9155 0 0 1 0 -31.831"
-                          />
-                          <text x="18" y="20.35" className="percentage">{profileCompletion}%</text>
-                        </svg>
+                    <div className="me-4">
+                      <div className="rounded-circle d-flex align-items-center justify-content-center"
+                        style={{
+                          width: '100px', height: '100px',
+                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          color: 'white', fontSize: '2.5rem', fontWeight: 'bold'
+                        }}>
+                        {profileData?.name?.charAt(0).toUpperCase()}
                       </div>
                     </div>
-                    <small className="text-muted">Profile Complete</small>
+                    <div>
+                      <h2 className="mb-1">{profileData?.name}</h2>
+                      <p className="text-muted mb-2">{profileData?.email}</p>
+                      <span className={`badge ${getRoleBadgeClass()}`}>{getRoleDisplay()}</span>
+                    </div>
                   </div>
                 </div>
-              </Card.Body>
-            </Card>
+                <div className="col-md-4 text-md-end mt-3 mt-md-0">
+                  <h3>43%</h3>
+                  <p className="text-muted small">Profile Complete</p>
+                </div>
+              </div>
+            </div>
+          </div>
 
-            {/* Profile Form */}
-            <Card className="border-0 shadow-sm">
-              <Card.Header className="bg-white border-bottom d-flex justify-content-between align-items-center">
-                <h5 className="mb-0">Personal Information</h5>
-                {!isEditing && (
-                  <Button 
-                    variant="outline-primary" 
-                    size="sm"
-                    onClick={() => setIsEditing(true)}
-                  >
-                    <FaEdit className="me-2" />
-                    Edit Profile
-                  </Button>
-                )}
-              </Card.Header>
-              <Card.Body className="p-4">
-                {message.text && (
-                  <Alert variant={message.type} dismissible onClose={() => setMessage({ type: '', text: '' })}>
-                    {message.text}
-                  </Alert>
-                )}
+          {/* Details Card */}
+          <div className="card shadow-sm">
+            <div className="card-body p-4">
+              <div className="d-flex justify-content-between mb-4">
+                <h4>Personal Information</h4>
+                <button className="btn btn-primary">
+                  <i className="bi bi-pencil me-2"></i>Edit Profile
+                </button>
+              </div>
 
-                <Form onSubmit={handleSubmit}>
-                  <Row>
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>
-                          <FaUser className="me-2" />
-                          Full Name
-                        </Form.Label>
-                        <Form.Control
-                          type="text"
-                          name="name"
-                          value={formData.name}
-                          disabled
-                        />
-                      </Form.Group>
-                    </Col>
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>
-                          <FaEnvelope className="me-2" />
-                          Email Address
-                        </Form.Label>
-                        <Form.Control
-                          type="email"
-                          name="email"
-                          value={formData.email}
-                          disabled
-                        />
-                      </Form.Group>
-                    </Col>
-                  </Row>
+              <div className="row">
+                <div className="col-md-6 mb-3">
+                  <label className="form-label fw-bold">
+                    <i className="bi bi-person me-2"></i>Full Name
+                  </label>
+                  <input type="text" className="form-control" value={profileData?.name || ''} disabled />
+                </div>
 
-                  <Row>
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>
-                          <FaPhone className="me-2" />
-                          Phone Number
-                        </Form.Label>
-                        <Form.Control
-                          type="tel"
-                          name="phone"
-                          value={formData.phone}
-                          onChange={handleChange}
-                          placeholder="Enter your phone number"
-                          disabled={!isEditing}
-                        />
-                      </Form.Group>
-                    </Col>
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>
-                          <FaMapMarkerAlt className="me-2" />
-                          Location
-                        </Form.Label>
-                        <Form.Control
-                          type="text"
-                          name="location"
-                          value={formData.location}
-                          onChange={handleChange}
-                          placeholder="City, State"
-                          disabled={!isEditing}
-                        />
-                      </Form.Group>
-                    </Col>
-                  </Row>
+                <div className="col-md-6 mb-3">
+                  <label className="form-label fw-bold">
+                    <i className="bi bi-envelope me-2"></i>Email Address
+                  </label>
+                  <input type="email" className="form-control" value={profileData?.email || ''} disabled />
+                </div>
 
-                  <Form.Group className="mb-3">
-                    <Form.Label>Current Education</Form.Label>
-                    <Form.Select
-                      name="education"
-                      value={formData.education}
-                      onChange={handleChange}
-                      disabled={!isEditing}
-                    >
-                      <option value="">Select your education level</option>
-                      <option value="10th">10th Standard</option>
-                      <option value="12th">12th Standard</option>
-                      <option value="Undergraduate">Undergraduate</option>
-                      <option value="Graduate">Graduate</option>
-                      <option value="Postgraduate">Postgraduate</option>
-                    </Form.Select>
-                  </Form.Group>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Interests (comma separated)</Form.Label>
-                    <Form.Control
-                      type="text"
-                      name="interests"
-                      value={formData.interests}
-                      onChange={handleChange}
-                      placeholder="e.g., Technology, Art, Science, Sports"
-                      disabled={!isEditing}
-                    />
-                    <Form.Text className="text-muted">
-                      Help us understand what you're passionate about
-                    </Form.Text>
-                  </Form.Group>
-
-                  <Form.Group className="mb-4">
-                    <Form.Label>Career Goals</Form.Label>
-                    <Form.Control
-                      as="textarea"
-                      rows={3}
-                      name="goals"
-                      value={formData.goals}
-                      onChange={handleChange}
-                      placeholder="What are your career aspirations?"
-                      disabled={!isEditing}
-                    />
-                  </Form.Group>
-
-                  {isEditing && (
-                    <div className="d-flex gap-2">
-                      <Button variant="primary" type="submit">
-                        <FaSave className="me-2" />
-                        Save Changes
-                      </Button>
-                      <Button 
-                        variant="secondary" 
-                        onClick={() => setIsEditing(false)}
-                      >
-                        Cancel
-                      </Button>
+                {role === 'counsellor' && (
+                  <>
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label fw-bold">
+                        <i className="bi bi-phone me-2"></i>Phone Number
+                      </label>
+                      <input type="tel" className="form-control" value={profileData?.phone || ''} disabled />
                     </div>
-                  )}
-                </Form>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      </Container>
+
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label fw-bold">
+                        <i className="bi bi-geo-alt me-2"></i>Location
+                      </label>
+                      <input type="text" className="form-control" value={profileData?.location || 'City, State'} disabled />
+                    </div>
+
+                    <div className="col-12"><hr/><h5 className="mb-3">Professional Details</h5></div>
+
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label fw-bold">Specialization</label>
+                      <input type="text" className="form-control" value={profileData?.profile?.specialization || ''} disabled />
+                    </div>
+
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label fw-bold">Experience</label>
+                      <input type="text" className="form-control" value={`${profileData?.profile?.experience || 0} years`} disabled />
+                    </div>
+
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label fw-bold">Education</label>
+                      <input type="text" className="form-control" value={profileData?.profile?.education || ''} disabled />
+                    </div>
+
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label fw-bold">Hourly Rate</label>
+                      <input type="text" className="form-control" value={`₹${profileData?.profile?.hourly_rate || 0}/hour`} disabled />
+                    </div>
+
+                    <div className="col-12 mb-3">
+                      <label className="form-label fw-bold">Bio</label>
+                      <textarea className="form-control" rows="3" value={profileData?.profile?.bio || 'No bio added yet'} disabled />
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
-};
+}
 
 export default Profile;

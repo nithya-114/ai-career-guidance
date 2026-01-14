@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { Form, Button, Alert, Container, Row, Col, Card } from 'react-bootstrap';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import '../assets/css/Auth.css';
 
 function RegisterCounsellor() {
   const navigate = useNavigate();
-  const { register } = useAuth();
+  const { login } = useAuth(); // This updates auth context
 
   const [formData, setFormData] = useState({
     name: '',
+    username: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -18,91 +18,161 @@ function RegisterCounsellor() {
     experience: '',
     education: '',
     bio: '',
-    agreeToTerms: false
+    hourly_rate: '500'
   });
 
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
-  const [apiError, setApiError] = useState('');
+  const [usernameAvailable, setUsernameAvailable] = useState(null);
+  const [emailAvailable, setEmailAvailable] = useState(null);
 
-  const specializations = [
-    'Career Counselling',
-    'Engineering Guidance',
-    'Medical Career Advice',
-    'Business & Management',
-    'Arts & Humanities',
-    'Science & Research',
-    'IT & Technology',
-    'General Counselling'
-  ];
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+  // Validate password strength
+  const validatePassword = (password) => {
+    const minLength = 8;
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+    if (password.length < minLength) {
+      return 'Password must be at least 8 characters long';
+    }
+    if (!hasUpperCase) {
+      return 'Password must contain at least one uppercase letter';
+    }
+    if (!hasLowerCase) {
+      return 'Password must contain at least one lowercase letter';
+    }
+    if (!hasNumber) {
+      return 'Password must contain at least one number';
+    }
+    if (!hasSpecialChar) {
+      return 'Password must contain at least one special character (!@#$%^&*(),.?":{}|<>)';
+    }
+    return null;
+  };
+
+  // Check username availability
+  const checkUsername = async (username) => {
+    if (username.length < 3) {
+      setUsernameAvailable(null);
+      return;
+    }
+
+    try {
+      const response = await axios.post(`${API_URL}/auth/check-username`, { username });
+      setUsernameAvailable(response.data.available);
+    } catch (error) {
+      console.error('Error checking username:', error);
+    }
+  };
+
+  // Check email availability
+  const checkEmail = async (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setEmailAvailable(null);
+      return;
+    }
+
+    try {
+      const response = await axios.post(`${API_URL}/auth/check-email`, { email });
+      setEmailAvailable(response.data.available);
+    } catch (error) {
+      console.error('Error checking email:', error);
+    }
+  };
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData({
-      ...formData,
-      [name]: type === 'checkbox' ? checked : value
-    });
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors({ ...errors, [name]: '' });
+    const { name, value } = e.target;
+    
+    // Update form data
+    setFormData(prevData => ({
+      ...prevData,
+      [name]: value
+    }));
+    
+    // Clear error for this field
+    setErrors(prevErrors => ({
+      ...prevErrors,
+      [name]: ''
+    }));
+
+    // Real-time validation
+    if (name === 'username') {
+      checkUsername(value);
+    }
+    if (name === 'email') {
+      checkEmail(value);
+    }
+    if (name === 'password') {
+      const passwordError = validatePassword(value);
+      if (passwordError) {
+        setErrors(prevErrors => ({ ...prevErrors, password: passwordError }));
+      }
+    }
+    if (name === 'confirmPassword') {
+      if (value !== formData.password) {
+        setErrors(prevErrors => ({ ...prevErrors, confirmPassword: 'Passwords do not match' }));
+      }
     }
   };
 
   const validateForm = () => {
     const newErrors = {};
 
-    // Name validation
-    if (!formData.name.trim()) {
-      newErrors.name = 'Name is required';
-    } else if (formData.name.trim().length < 3) {
-      newErrors.name = 'Name must be at least 3 characters';
+    // Required fields
+    if (!formData.name.trim()) newErrors.name = 'Name is required';
+    if (!formData.username.trim()) newErrors.username = 'Username is required';
+    if (!formData.email.trim()) newErrors.email = 'Email is required';
+    if (!formData.password) newErrors.password = 'Password is required';
+    if (!formData.confirmPassword) newErrors.confirmPassword = 'Please confirm password';
+    if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
+    if (!formData.specialization || formData.specialization === '') {
+      newErrors.specialization = 'Specialization is required';
+    }
+    if (!formData.experience) newErrors.experience = 'Experience is required';
+    if (!formData.education.trim()) newErrors.education = 'Education is required';
+
+    // Validation rules
+    if (formData.username.length < 3) {
+      newErrors.username = 'Username must be at least 3 characters';
     }
 
-    // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!emailRegex.test(formData.email)) {
+    if (!emailRegex.test(formData.email)) {
       newErrors.email = 'Invalid email format';
     }
 
-    // Phone validation
-    if (!formData.phone.trim()) {
-      newErrors.phone = 'Phone number is required';
-    } else if (formData.phone.length < 10) {
-      newErrors.phone = 'Phone number must be at least 10 digits';
-    }
-
-    // Specialization validation
-    if (!formData.specialization) {
-      newErrors.specialization = 'Specialization is required';
-    }
-
-    // Experience validation
-    if (!formData.experience.trim()) {
-      newErrors.experience = 'Experience is required';
-    }
-
-    // Education validation
-    if (!formData.education.trim()) {
-      newErrors.education = 'Education qualification is required';
-    }
-
     // Password validation
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
+    const passwordError = validatePassword(formData.password);
+    if (passwordError) {
+      newErrors.password = passwordError;
     }
 
-    // Confirm password validation
     if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
     }
 
-    // Terms validation
-    if (!formData.agreeToTerms) {
-      newErrors.agreeToTerms = 'You must agree to the terms and conditions';
+    // Phone validation
+    const phoneRegex = /^[0-9]{10}$/;
+    if (!phoneRegex.test(formData.phone.replace(/\s/g, ''))) {
+      newErrors.phone = 'Phone number must be 10 digits';
+    }
+
+    // Experience validation
+    if (formData.experience < 0 || formData.experience > 50) {
+      newErrors.experience = 'Experience must be between 0 and 50 years';
+    }
+
+    // Check availability
+    if (usernameAvailable === false) {
+      newErrors.username = 'Username is already taken';
+    }
+    if (emailAvailable === false) {
+      newErrors.email = 'Email is already registered';
     }
 
     setErrors(newErrors);
@@ -111,246 +181,314 @@ function RegisterCounsellor() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setApiError('');
+
+    console.log('Form submitted with data:', formData);
 
     if (!validateForm()) {
+      console.log('Validation failed:', errors);
       return;
     }
 
     setLoading(true);
 
     try {
-      // Register as counsellor with additional profile data
-      await register({
+      const payload = {
         name: formData.name,
+        username: formData.username,
         email: formData.email,
         password: formData.password,
         role: 'counsellor',
         phone: formData.phone,
         profile: {
           specialization: formData.specialization,
-          experience: formData.experience,
+          experience: parseInt(formData.experience),
           education: formData.education,
-          bio: formData.bio
+          bio: formData.bio,
+          hourly_rate: parseInt(formData.hourly_rate),
+          rating: 4.5,
+          sessions_conducted: 0
         }
-      });
+      };
 
-      // Success - redirect to dashboard
+      console.log('Sending to backend:', payload);
+
+      const response = await axios.post(`${API_URL}/auth/register`, payload);
+
+      console.log('Registration response:', response.data);
+
+      // Store token and user data
+      localStorage.setItem('token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      localStorage.setItem('user_id', response.data.user.id);
+      localStorage.setItem('user_name', response.data.user.name);
+      localStorage.setItem('user_email', response.data.user.email);
+      localStorage.setItem('user_role', response.data.user.role);
+      
+      // Update auth context - THIS IS CRITICAL!
+      login(response.data.user, response.data.token);
+
+      console.log('✅ Auth context updated, navigating to dashboard...');
+
+      alert('✅ Registration successful! Welcome to AI Career Counselling.');
+      
+      // Navigate to dashboard
       navigate('/dashboard');
+
     } catch (error) {
-      setApiError(error.response?.data?.error || 'Registration failed. Please try again.');
+      console.error('Registration error:', error);
+      
+      if (error.response?.data?.error) {
+        alert('❌ ' + error.response.data.error);
+      } else {
+        alert('❌ Registration failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="auth-page">
-      <Container>
-        <Row className="justify-content-center">
-          <Col md={8} lg={6}>
-            <Card className="auth-card">
-              <Card.Body className="p-5">
-                <div className="text-center mb-4">
-                  <h2 className="mb-2">Register as Counsellor</h2>
-                  <p className="text-muted">Join us to guide students in their career journey</p>
+    <div className="container mt-5 mb-5">
+      <div className="row justify-content-center">
+        <div className="col-lg-8">
+          <div className="card shadow-sm">
+            <div className="card-body p-5">
+              {/* Header */}
+              <div className="text-center mb-4">
+                <h2 className="fw-bold">👨‍🏫 Counsellor Registration</h2>
+                <p className="text-muted">Join our platform to help students achieve their career goals</p>
+              </div>
+
+              <form onSubmit={handleSubmit}>
+                {/* Personal Information */}
+                <h5 className="mb-3 text-primary">Personal Information</h5>
+
+                {/* Name */}
+                <div className="mb-3">
+                  <label className="form-label">Full Name *</label>
+                  <input
+                    type="text"
+                    className={`form-control ${errors.name ? 'is-invalid' : ''}`}
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    placeholder="Dr. John Smith"
+                  />
+                  {errors.name && <div className="invalid-feedback">{errors.name}</div>}
                 </div>
 
-                {apiError && (
-                  <Alert variant="danger" dismissible onClose={() => setApiError('')}>
-                    {apiError}
-                  </Alert>
-                )}
+                {/* Username */}
+                <div className="mb-3">
+                  <label className="form-label">Username *</label>
+                  <input
+                    type="text"
+                    className={`form-control ${errors.username ? 'is-invalid' : usernameAvailable === true ? 'is-valid' : ''}`}
+                    name="username"
+                    value={formData.username}
+                    onChange={handleChange}
+                    placeholder="johnsmith"
+                  />
+                  {errors.username && <div className="invalid-feedback">{errors.username}</div>}
+                  {usernameAvailable === true && (
+                    <div className="valid-feedback">Username is available!</div>
+                  )}
+                  {usernameAvailable === false && (
+                    <div className="invalid-feedback d-block">Username is already taken</div>
+                  )}
+                </div>
 
-                <Form onSubmit={handleSubmit}>
-                  {/* Personal Information */}
-                  <h5 className="mb-3 text-primary">Personal Information</h5>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Full Name *</Form.Label>
-                    <Form.Control
-                      type="text"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleChange}
-                      isInvalid={!!errors.name}
-                      placeholder="Dr. Jane Smith"
-                    />
-                    <Form.Control.Feedback type="invalid">
-                      {errors.name}
-                    </Form.Control.Feedback>
-                  </Form.Group>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Email Address *</Form.Label>
-                    <Form.Control
+                {/* Email & Phone */}
+                <div className="row">
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Email *</label>
+                    <input
                       type="email"
+                      className={`form-control ${errors.email ? 'is-invalid' : emailAvailable === true ? 'is-valid' : ''}`}
                       name="email"
                       value={formData.email}
                       onChange={handleChange}
-                      isInvalid={!!errors.email}
-                      placeholder="jane.smith@example.com"
+                      placeholder="john@example.com"
                     />
-                    <Form.Control.Feedback type="invalid">
-                      {errors.email}
-                    </Form.Control.Feedback>
-                  </Form.Group>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Phone Number *</Form.Label>
-                    <Form.Control
+                    {errors.email && <div className="invalid-feedback">{errors.email}</div>}
+                    {emailAvailable === true && (
+                      <div className="valid-feedback">Email is available!</div>
+                    )}
+                    {emailAvailable === false && (
+                      <div className="invalid-feedback d-block">Email is already registered</div>
+                    )}
+                  </div>
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Phone Number *</label>
+                    <input
                       type="tel"
+                      className={`form-control ${errors.phone ? 'is-invalid' : ''}`}
                       name="phone"
                       value={formData.phone}
                       onChange={handleChange}
-                      isInvalid={!!errors.phone}
-                      placeholder="1234567890"
+                      placeholder="9876543210"
                     />
-                    <Form.Control.Feedback type="invalid">
-                      {errors.phone}
-                    </Form.Control.Feedback>
-                  </Form.Group>
+                    {errors.phone && <div className="invalid-feedback">{errors.phone}</div>}
+                  </div>
+                </div>
 
-                  {/* Professional Information */}
-                  <h5 className="mb-3 mt-4 text-primary">Professional Information</h5>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Specialization *</Form.Label>
-                    <Form.Select
-                      name="specialization"
-                      value={formData.specialization}
-                      onChange={handleChange}
-                      isInvalid={!!errors.specialization}
-                    >
-                      <option value="">Select your specialization</option>
-                      {specializations.map((spec, index) => (
-                        <option key={index} value={spec}>{spec}</option>
-                      ))}
-                    </Form.Select>
-                    <Form.Control.Feedback type="invalid">
-                      {errors.specialization}
-                    </Form.Control.Feedback>
-                  </Form.Group>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Years of Experience *</Form.Label>
-                    <Form.Control
-                      type="text"
-                      name="experience"
-                      value={formData.experience}
-                      onChange={handleChange}
-                      isInvalid={!!errors.experience}
-                      placeholder="e.g., 5 years"
-                    />
-                    <Form.Control.Feedback type="invalid">
-                      {errors.experience}
-                    </Form.Control.Feedback>
-                  </Form.Group>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Education Qualification *</Form.Label>
-                    <Form.Control
-                      type="text"
-                      name="education"
-                      value={formData.education}
-                      onChange={handleChange}
-                      isInvalid={!!errors.education}
-                      placeholder="e.g., M.A. in Psychology"
-                    />
-                    <Form.Control.Feedback type="invalid">
-                      {errors.education}
-                    </Form.Control.Feedback>
-                  </Form.Group>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Bio (Optional)</Form.Label>
-                    <Form.Control
-                      as="textarea"
-                      rows={3}
-                      name="bio"
-                      value={formData.bio}
-                      onChange={handleChange}
-                      placeholder="Tell students about yourself and your expertise..."
-                    />
-                  </Form.Group>
-
-                  {/* Security */}
-                  <h5 className="mb-3 mt-4 text-primary">Security</h5>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Password *</Form.Label>
-                    <Form.Control
+                {/* Password */}
+                <div className="row">
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Password *</label>
+                    <input
                       type="password"
+                      className={`form-control ${errors.password ? 'is-invalid' : ''}`}
                       name="password"
                       value={formData.password}
                       onChange={handleChange}
-                      isInvalid={!!errors.password}
-                      placeholder="At least 6 characters"
+                      placeholder="••••••••"
                     />
-                    <Form.Control.Feedback type="invalid">
-                      {errors.password}
-                    </Form.Control.Feedback>
-                  </Form.Group>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Confirm Password *</Form.Label>
-                    <Form.Control
+                    {errors.password && <div className="invalid-feedback">{errors.password}</div>}
+                    <small className="text-muted">
+                      Must be 8+ characters with uppercase, lowercase, number, and special character
+                    </small>
+                  </div>
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Confirm Password *</label>
+                    <input
                       type="password"
+                      className={`form-control ${errors.confirmPassword ? 'is-invalid' : ''}`}
                       name="confirmPassword"
                       value={formData.confirmPassword}
                       onChange={handleChange}
-                      isInvalid={!!errors.confirmPassword}
-                      placeholder="Re-enter your password"
+                      placeholder="••••••••"
                     />
-                    <Form.Control.Feedback type="invalid">
-                      {errors.confirmPassword}
-                    </Form.Control.Feedback>
-                  </Form.Group>
+                    {errors.confirmPassword && (
+                      <div className="invalid-feedback">{errors.confirmPassword}</div>
+                    )}
+                  </div>
+                </div>
 
-                  <Form.Group className="mb-4">
-                    <Form.Check
-                      type="checkbox"
-                      name="agreeToTerms"
-                      checked={formData.agreeToTerms}
+                <hr className="my-4" />
+
+                {/* Professional Information */}
+                <h5 className="mb-3 text-primary">Professional Information</h5>
+
+                {/* Specialization & Experience */}
+                <div className="row">
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Specialization *</label>
+                    <select
+                      className={`form-select ${errors.specialization ? 'is-invalid' : formData.specialization ? 'is-valid' : ''}`}
+                      name="specialization"
+                      value={formData.specialization}
                       onChange={handleChange}
-                      isInvalid={!!errors.agreeToTerms}
-                      label={
-                        <span>
-                          I agree to the{' '}
-                          <Link to="/terms">Terms & Conditions</Link> and{' '}
-                          <Link to="/privacy">Privacy Policy</Link>
-                        </span>
-                      }
-                      feedback={errors.agreeToTerms}
-                      feedbackType="invalid"
+                    >
+                      <option value="">Select specialization</option>
+                      <option value="Career Guidance">Career Guidance</option>
+                      <option value="Technology">Technology Careers</option>
+                      <option value="Medical">Medical Careers</option>
+                      <option value="Business">Business & Management</option>
+                      <option value="Engineering">Engineering</option>
+                      <option value="Arts & Design">Arts & Design</option>
+                      <option value="Science">Science & Research</option>
+                    </select>
+                    {errors.specialization && (
+                      <div className="invalid-feedback">{errors.specialization}</div>
+                    )}
+                    {formData.specialization && !errors.specialization && (
+                      <div className="valid-feedback">Selected: {formData.specialization}</div>
+                    )}
+                  </div>
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Years of Experience *</label>
+                    <input
+                      type="number"
+                      className={`form-control ${errors.experience ? 'is-invalid' : ''}`}
+                      name="experience"
+                      value={formData.experience}
+                      onChange={handleChange}
+                      min="0"
+                      max="50"
+                      placeholder="5"
                     />
-                  </Form.Group>
+                    {errors.experience && (
+                      <div className="invalid-feedback">{errors.experience}</div>
+                    )}
+                  </div>
+                </div>
 
-                  <Button
-                    variant="primary"
+                {/* Education */}
+                <div className="mb-3">
+                  <label className="form-label">Education *</label>
+                  <input
+                    type="text"
+                    className={`form-control ${errors.education ? 'is-invalid' : ''}`}
+                    name="education"
+                    value={formData.education}
+                    onChange={handleChange}
+                    placeholder="Ph.D. in Psychology, M.Ed. in Career Counseling"
+                  />
+                  {errors.education && <div className="invalid-feedback">{errors.education}</div>}
+                </div>
+
+                {/* Hourly Rate */}
+                <div className="mb-3">
+                  <label className="form-label">Hourly Rate (₹) *</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    name="hourly_rate"
+                    value={formData.hourly_rate}
+                    onChange={handleChange}
+                    min="100"
+                    max="10000"
+                    step="50"
+                  />
+                  <small className="text-muted">Your consultation fee per hour</small>
+                </div>
+
+                {/* Bio */}
+                <div className="mb-3">
+                  <label className="form-label">Professional Bio</label>
+                  <textarea
+                    className="form-control"
+                    name="bio"
+                    value={formData.bio}
+                    onChange={handleChange}
+                    rows="4"
+                    placeholder="Tell students about your experience, approach, and how you can help them..."
+                  />
+                  <small className="text-muted">Optional - Appears on your profile</small>
+                </div>
+
+                {/* Submit Button */}
+                <div className="d-grid gap-2 mt-4">
+                  <button
                     type="submit"
-                    className="w-100 auth-btn"
+                    className="btn btn-primary btn-lg"
                     disabled={loading}
                   >
-                    {loading ? 'Creating Account...' : 'Register as Counsellor'}
-                  </Button>
-                </Form>
+                    {loading ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2"></span>
+                        Registering...
+                      </>
+                    ) : (
+                      'Register as Counsellor'
+                    )}
+                  </button>
+                </div>
 
-                <div className="text-center mt-4">
-                  <p className="mb-2">
+                {/* Login Link */}
+                <div className="text-center mt-3">
+                  <p className="text-muted mb-0">
                     Already have an account?{' '}
-                    <Link to="/login">Login here</Link>
-                  </p>
-                  <p className="text-muted">
-                    Are you a student?{' '}
-                    <Link to="/register">Register as Student</Link>
+                    <a href="/login" className="text-primary fw-bold">
+                      Login here
+                    </a>
                   </p>
                 </div>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      </Container>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,71 +1,150 @@
 import React from 'react';
-import { Navbar, Nav, Container, Button, Dropdown } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { FaUser, FaSignOutAlt, FaBrain } from 'react-icons/fa';
 
-const NavigationBar = () => {
+function NavigationBar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
     logout();
-    navigate('/');
+    navigate('/login');
   };
 
   return (
-    <Navbar bg="primary" variant="dark" expand="lg" sticky="top">
-      <Container>
-        <Navbar.Brand as={Link} to="/">
-          <FaBrain className="me-2" />
+    <nav className="navbar navbar-expand-lg navbar-dark" style={{ 
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+    }}>
+      <div className="container-fluid">
+        {/* Logo/Brand */}
+        <Link className="navbar-brand fw-bold" to={user ? "/dashboard" : "/"}>
+          <i className="bi bi-mortarboard-fill me-2"></i>
           CareerGuide AI
-        </Navbar.Brand>
-        <Navbar.Toggle aria-controls="basic-navbar-nav" />
-        <Navbar.Collapse id="basic-navbar-nav">
-          <Nav className="ms-auto">
-            <Nav.Link as={Link} to="/">Home</Nav.Link>
-            <Nav.Link as={Link} to="/careers">Careers</Nav.Link>
-            <Nav.Link as={Link} to="/colleges">Colleges</Nav.Link>
-            
-            {user ? (
-              <>
-                <Nav.Link as={Link} to="/dashboard">Dashboard</Nav.Link>
-                <Nav.Link as={Link} to="/chat">Chat</Nav.Link>
-                
-                <Dropdown align="end">
-                  <Dropdown.Toggle variant="outline-light" id="dropdown-basic">
-                    <FaUser className="me-2" />
-                    {user.name}
-                  </Dropdown.Toggle>
+        </Link>
 
-                  <Dropdown.Menu>
-                    <Dropdown.Item as={Link} to="/profile">
-                      <FaUser className="me-2" />
-                      My Profile
-                    </Dropdown.Item>
-                    <Dropdown.Divider />
-                    <Dropdown.Item onClick={handleLogout}>
-                      <FaSignOutAlt className="me-2" />
-                      Logout
-                    </Dropdown.Item>
-                  </Dropdown.Menu>
-                </Dropdown>
+        {/* Mobile Toggle */}
+        <button
+          className="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navbarNav"
+        >
+          <span className="navbar-toggler-icon"></span>
+        </button>
+
+        {/* Navigation Links */}
+        <div className="collapse navbar-collapse" id="navbarNav">
+          <ul className="navbar-nav ms-auto align-items-center">
+            {!user ? (
+              // NOT LOGGED IN
+              <>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/">Home</Link>
+                </li>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/careers">Careers</Link>
+                </li>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/colleges">Colleges</Link>
+                </li>
+                <li className="nav-item">
+                  <Link className="nav-link btn btn-light text-primary px-3 ms-2" to="/login">
+                    Login
+                  </Link>
+                </li>
+                <li className="nav-item ms-2">
+                  <Link className="nav-link btn btn-outline-light px-3" to="/register">
+                    Register
+                  </Link>
+                </li>
+              </>
+            ) : user.role === 'counsellor' ? (
+              // COUNSELLOR - Dashboard only
+              <>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/dashboard">
+                    <i className="bi bi-speedometer2 me-1"></i>
+                    Dashboard
+                  </Link>
+                </li>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/profile">
+                    <i className="bi bi-person-circle me-1"></i>
+                    {user.name}
+                  </Link>
+                </li>
+                <li className="nav-item">
+                  <button 
+                    className="btn btn-outline-light btn-sm ms-2"
+                    onClick={handleLogout}
+                  >
+                    <i className="bi bi-box-arrow-right me-1"></i>
+                    Logout
+                  </button>
+                </li>
+              </>
+            ) : user.role === 'admin' ? (
+              // ADMIN - Dashboard only (no careers/colleges browsing)
+              <>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/dashboard">
+                    <i className="bi bi-speedometer2 me-1"></i>
+                    Dashboard
+                  </Link>
+                </li>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/profile">
+                    <i className="bi bi-person-circle me-1"></i>
+                    {user.name}
+                  </Link>
+                </li>
+                <li className="nav-item">
+                  <button 
+                    className="btn btn-outline-light btn-sm ms-2"
+                    onClick={handleLogout}
+                  >
+                    <i className="bi bi-box-arrow-right me-1"></i>
+                    Logout
+                  </button>
+                </li>
               </>
             ) : (
+              // STUDENT - Full access
               <>
-                <Nav.Link as={Link} to="/login">
-                  <Button variant="outline-light" size="sm">Login</Button>
-                </Nav.Link>
-                <Nav.Link as={Link} to="/register">
-                  <Button variant="light" size="sm">Register</Button>
-                </Nav.Link>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/careers">Careers</Link>
+                </li>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/colleges">Colleges</Link>
+                </li>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/dashboard">Dashboard</Link>
+                </li>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/chat">Chat</Link>
+                </li>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/profile">
+                    <i className="bi bi-person-circle me-1"></i>
+                    {user.name}
+                  </Link>
+                </li>
+                <li className="nav-item">
+                  <button 
+                    className="btn btn-outline-light btn-sm ms-2"
+                    onClick={handleLogout}
+                  >
+                    <i className="bi bi-box-arrow-right me-1"></i>
+                    Logout
+                  </button>
+                </li>
               </>
             )}
-          </Nav>
-        </Navbar.Collapse>
-      </Container>
-    </Navbar>
+          </ul>
+        </div>
+      </div>
+    </nav>
   );
-};
+}
 
 export default NavigationBar;

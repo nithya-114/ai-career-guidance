@@ -1,308 +1,430 @@
 import React, { useEffect, useState } from 'react';
-import { Container, Row, Col, Card, Button, ProgressBar, Badge, ListGroup } from 'react-bootstrap';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { 
-  FaComments, 
-  FaClipboardCheck, 
-  FaBriefcase, 
-  FaUniversity,
-  FaChartLine,
-  FaTrophy,
-  FaClock
-} from 'react-icons/fa';
+import axios from 'axios';
 import '../assets/css/Dashboard.css';
 
-const Dashboard = () => {
+function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const [greeting, setGreeting] = useState('');
+  const [profileData, setProfileData] = useState(null);
+  const [appointments, setAppointments] = useState([]);
   const [stats, setStats] = useState({
-    profileComplete: 65,
-    quizCompleted: false,
-    chatSessions: 3,
-    recommendationsReceived: false,
+    totalSessions: 0,
+    averageRating: 0,
+    studentsHelped: 0,
+    earnings: 0,
+    pendingAppointments: 0,
+    completedAppointments: 0
   });
+  const [loading, setLoading] = useState(true);
 
-  const recentActivities = [
-    { id: 1, text: 'Completed personality quiz', time: '2 days ago', icon: FaClipboardCheck, color: 'success' },
-    { id: 2, text: 'Chat session with AI counselor', time: '5 days ago', icon: FaComments, color: 'primary' },
-    { id: 3, text: 'Viewed Software Engineer career', time: '1 week ago', icon: FaBriefcase, color: 'warning' },
-  ];
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
-  const quickActions = [
-    {
-      title: 'Chat with AI',
-      description: 'Get personalized career guidance',
-      icon: FaComments,
-      color: 'primary',
-      link: '/chat',
-      buttonText: 'Start Chat'
-    },
-    {
-      title: 'Take Quiz',
-      description: 'Assess your aptitude & personality',
-      icon: FaClipboardCheck,
-      color: 'success',
-      link: '/quiz/aptitude',
-      buttonText: 'Take Quiz'
-    },
-    {
-      title: 'Explore Careers',
-      description: 'Browse career options',
-      icon: FaBriefcase,
-      color: 'warning',
-      link: '/careers',
-      buttonText: 'View Careers'
-    },
-    {
-      title: 'Find Colleges',
-      description: 'Discover best colleges for you',
-      icon: FaUniversity,
-      color: 'info',
-      link: '/colleges',
-      buttonText: 'Find Colleges'
-    },
-  ];
+  useEffect(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) setGreeting('Good Morning');
+    else if (hour < 18) setGreeting('Good Afternoon');
+    else setGreeting('Good Evening');
+
+    fetchUserData();
+  }, []);
+
+  const fetchUserData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      // Fetch user profile
+      const profileResponse = await axios.get(`${API_URL}/user/profile`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      console.log('Profile data:', profileResponse.data);
+      setProfileData(profileResponse.data);
+
+      // If counsellor, fetch appointments
+      if (profileResponse.data.role === 'counsellor') {
+        // TODO: Fetch appointments from backend
+        // For now using mock data
+        const profile = profileResponse.data.profile || {};
+        setStats({
+          totalSessions: profile.sessions_conducted || 0,
+          averageRating: profile.rating || 4.5,
+          studentsHelped: profile.sessions_conducted || 0,
+          earnings: (profile.sessions_conducted || 0) * (profile.hourly_rate || 500),
+          pendingAppointments: 0,
+          completedAppointments: 0
+        });
+      }
+
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      setLoading(false);
+    }
+  };
+
+  // STUDENT DASHBOARD
+  const StudentDashboard = () => {
+    const quickActions = [
+      {
+        icon: '💬',
+        title: 'Chat with AI',
+        description: 'Get personalized career guidance',
+        action: () => navigate('/chat'),
+        color: 'primary',
+        bgColor: '#e8eaf6'
+      },
+      {
+        icon: '✅',
+        title: 'Take Quiz',
+        description: 'Assess your aptitude & personality',
+        action: () => navigate('/quiz'),
+        color: 'success',
+        bgColor: '#e8f5e9'
+      },
+      {
+        icon: '💼',
+        title: 'Explore Careers',
+        description: 'Browse career options',
+        action: () => navigate('/careers'),
+        color: 'warning',
+        bgColor: '#fff8e1'
+      },
+      {
+        icon: '🏛️',
+        title: 'Find Colleges',
+        description: 'Discover best colleges for you',
+        action: () => navigate('/colleges'),
+        color: 'info',
+        bgColor: '#e1f5fe'
+      },
+      {
+        icon: '👨‍🏫',
+        title: 'Book Counsellor Session',
+        description: 'Connect with expert counsellors',
+        action: () => navigate('/counsellors'),
+        color: 'danger',
+        bgColor: '#fce4ec'
+      },
+      {
+        icon: '🎯',
+        title: 'Get Recommendations',
+        description: 'AI-powered career suggestions',
+        action: () => navigate('/recommendations'),
+        color: 'secondary',
+        bgColor: '#f3e5f5'
+      }
+    ];
+
+    return (
+      <>
+        {/* Quick Actions */}
+        <div className="row mb-4">
+          <div className="col-12">
+            <h4 className="mb-3">Quick Actions</h4>
+          </div>
+          {quickActions.map((action, index) => (
+            <div key={index} className="col-lg-4 col-md-6 mb-4">
+              <div 
+                className="action-card card h-100 border-0 shadow-sm"
+                onClick={action.action}
+                style={{ cursor: 'pointer', transition: 'transform 0.2s' }}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+              >
+                <div className="card-body text-center p-4">
+                  <div 
+                    className="icon-wrapper mb-3 mx-auto d-flex align-items-center justify-content-center rounded-circle"
+                    style={{
+                      width: '80px',
+                      height: '80px',
+                      backgroundColor: action.bgColor,
+                      fontSize: '2.5rem'
+                    }}
+                  >
+                    {action.icon}
+                  </div>
+                  <h5 className="card-title mb-2">{action.title}</h5>
+                  <p className="card-text text-muted small">{action.description}</p>
+                  <button className={`btn btn-${action.color} btn-sm mt-2`}>
+                    {action.title.includes('Book') ? 'View Counsellors' :
+                     action.title.includes('Chat') ? 'Start Chat' :
+                     action.title.includes('Quiz') ? 'Take Quiz' :
+                     'Get Started'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </>
+    );
+  };
+
+  // COUNSELLOR DASHBOARD
+  const CounsellorDashboard = () => {
+    const counsellorActions = [
+      {
+        icon: '📅',
+        title: 'My Appointments',
+        description: 'View and manage scheduled sessions',
+        action: () => navigate('/appointments'),
+        color: 'primary',
+        bgColor: '#e8eaf6'
+      },
+      {
+        icon: '👥',
+        title: 'Student Profiles',
+        description: 'View assigned student profiles',
+        action: () => navigate('/students'),
+        color: 'success',
+        bgColor: '#e8f5e9'
+      },
+      {
+        icon: '📊',
+        title: 'Reports & Analytics',
+        description: 'View session reports and analytics',
+        action: () => navigate('/reports'),
+        color: 'info',
+        bgColor: '#e1f5fe'
+      },
+      {
+        icon: '⚙️',
+        title: 'Profile Settings',
+        description: 'Update your professional profile',
+        action: () => navigate('/profile'),
+        color: 'warning',
+        bgColor: '#fff8e1'
+      }
+    ];
+
+    return (
+      <>
+        {/* Counsellor Quick Actions */}
+        <div className="row mb-4">
+          <div className="col-12">
+            <h4 className="mb-3">Quick Actions</h4>
+          </div>
+          {counsellorActions.map((action, index) => (
+            <div key={index} className="col-lg-3 col-md-6 mb-4">
+              <div 
+                className="action-card card h-100 border-0 shadow-sm"
+                onClick={action.action}
+                style={{ cursor: 'pointer', transition: 'transform 0.2s' }}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+              >
+                <div className="card-body text-center p-4">
+                  <div 
+                    className="icon-wrapper mb-3 mx-auto d-flex align-items-center justify-content-center rounded-circle"
+                    style={{
+                      width: '70px',
+                      height: '70px',
+                      backgroundColor: action.bgColor,
+                      fontSize: '2rem'
+                    }}
+                  >
+                    {action.icon}
+                  </div>
+                  <h6 className="card-title mb-2">{action.title}</h6>
+                  <p className="card-text text-muted small">{action.description}</p>
+                  <button className={`btn btn-${action.color} btn-sm mt-2`}>
+                    View
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Upcoming Appointments */}
+        <div className="row mb-4">
+          <div className="col-12">
+            <div className="card border-0 shadow-sm">
+              <div className="card-body">
+                <h5 className="card-title mb-4">📅 Upcoming Appointments</h5>
+                {appointments.length === 0 ? (
+                  <div className="text-center py-5">
+                    <p className="text-muted mb-3">No upcoming appointments</p>
+                    <small className="text-muted">Students will see your profile in the counsellor directory</small>
+                  </div>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table table-hover">
+                      <thead>
+                        <tr>
+                          <th>Student</th>
+                          <th>Date & Time</th>
+                          <th>Duration</th>
+                          <th>Amount</th>
+                          <th>Status</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {appointments.map((apt, index) => (
+                          <tr key={index}>
+                            <td>{apt.student_name}</td>
+                            <td>{apt.date} {apt.time}</td>
+                            <td>{apt.duration}h</td>
+                            <td>₹{apt.amount}</td>
+                            <td><span className={`badge bg-${apt.status === 'scheduled' ? 'success' : 'warning'}`}>{apt.status}</span></td>
+                            <td>
+                              <button className="btn btn-sm btn-primary">View Profile</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Counsellor Profile Summary */}
+        {profileData?.profile && (
+          <div className="row">
+            <div className="col-12">
+              <div className="card border-0 shadow-sm">
+                <div className="card-body">
+                  <h5 className="card-title mb-3">👤 Your Professional Profile</h5>
+                  <div className="row">
+                    <div className="col-md-6">
+                      <p><strong>Specialization:</strong> {profileData.profile.specialization}</p>
+                      <p><strong>Experience:</strong> {profileData.profile.experience} years</p>
+                      <p><strong>Education:</strong> {profileData.profile.education}</p>
+                    </div>
+                    <div className="col-md-6">
+                      <p><strong>Hourly Rate:</strong> ₹{profileData.profile.hourly_rate}/hour</p>
+                      <p><strong>Rating:</strong> ⭐ {profileData.profile.rating}/5</p>
+                      <p><strong>Sessions Conducted:</strong> {profileData.profile.sessions_conducted}</p>
+                    </div>
+                  </div>
+                  {profileData.profile.bio && (
+                    <div className="mt-3">
+                      <p><strong>Bio:</strong></p>
+                      <p className="text-muted">{profileData.profile.bio}</p>
+                    </div>
+                  )}
+                  <button 
+                    className="btn btn-primary mt-2"
+                    onClick={() => navigate('/profile')}
+                  >
+                    Edit Profile
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '80vh' }}>
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading dashboard...</span>
+        </div>
+      </div>
+    );
+  }
+
+  const isCounsellor = profileData?.role === 'counsellor';
 
   return (
-    <div className="dashboard-page">
-      <Container className="py-5">
+    <div className="dashboard-container">
+      <div className="container-fluid py-4">
         {/* Welcome Section */}
-        <Row className="mb-4">
-          <Col>
-            <h2 className="display-6 fw-bold">
-              Welcome back, {user?.name}! 👋
-            </h2>
-            <p className="text-muted">Here's your career journey progress</p>
-          </Col>
-        </Row>
+        <div className="row mb-4">
+          <div className="col-12">
+            <div className="welcome-card p-4 rounded-3 shadow-sm" style={{
+              background: isCounsellor 
+                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+              color: 'white'
+            }}>
+              <div className="d-flex justify-content-between align-items-start">
+                <div>
+                  <h2 className="mb-2">
+                    {greeting}, <span className="fw-bold">{profileData?.name || user?.name || 'User'}!</span>
+                  </h2>
+                  <p className="mb-0" style={{ opacity: 0.9 }}>
+                    {isCounsellor 
+                      ? `👨‍🏫 Counsellor | ${profileData?.profile?.specialization || 'Not specified'} | ${profileData?.profile?.experience || 0} years experience`
+                      : '🎓 Student | Ready to explore your career options?'}
+                  </p>
+                  {isCounsellor && (
+                    <div className="mt-2">
+                      <small style={{ opacity: 0.8 }}>
+                        📧 {profileData?.email} | 📱 {profileData?.phone}
+                      </small>
+                    </div>
+                  )}
+                </div>
+                <div className="text-end">
+                  <span className={`badge ${isCounsellor ? 'bg-white text-primary' : 'bg-white text-danger'} fs-6 px-3 py-2`}>
+                    {isCounsellor ? '👨‍🏫 Counsellor' : '🎓 Student'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Stats Cards */}
-        <Row className="mb-4 g-4">
-          <Col md={3}>
-            <Card className="stats-card border-0 shadow-sm h-100">
-              <Card.Body>
-                <div className="d-flex align-items-center">
-                  <div className="stats-icon bg-primary-light">
-                    <FaChartLine className="text-primary" size={24} />
-                  </div>
-                  <div className="ms-3">
-                    <h3 className="mb-0">{stats.profileComplete}%</h3>
-                    <small className="text-muted">Profile Complete</small>
-                  </div>
+        {isCounsellor ? (
+          <div className="row mb-4">
+            <div className="col-md-3 mb-3">
+              <div className="card border-0 shadow-sm text-center">
+                <div className="card-body">
+                  <h3 className="text-primary mb-2">{stats.totalSessions}</h3>
+                  <p className="text-muted small mb-0">Total Sessions</p>
                 </div>
-              </Card.Body>
-            </Card>
-          </Col>
-
-          <Col md={3}>
-            <Card className="stats-card border-0 shadow-sm h-100">
-              <Card.Body>
-                <div className="d-flex align-items-center">
-                  <div className="stats-icon bg-success-light">
-                    <FaComments className="text-success" size={24} />
-                  </div>
-                  <div className="ms-3">
-                    <h3 className="mb-0">{stats.chatSessions}</h3>
-                    <small className="text-muted">Chat Sessions</small>
-                  </div>
+              </div>
+            </div>
+            <div className="col-md-3 mb-3">
+              <div className="card border-0 shadow-sm text-center">
+                <div className="card-body">
+                  <h3 className="text-success mb-2">{stats.averageRating.toFixed(1)}</h3>
+                  <p className="text-muted small mb-0">Average Rating</p>
                 </div>
-              </Card.Body>
-            </Card>
-          </Col>
-
-          <Col md={3}>
-            <Card className="stats-card border-0 shadow-sm h-100">
-              <Card.Body>
-                <div className="d-flex align-items-center">
-                  <div className="stats-icon bg-warning-light">
-                    <FaClipboardCheck className="text-warning" size={24} />
-                  </div>
-                  <div className="ms-3">
-                    <h3 className="mb-0">{stats.quizCompleted ? '2' : '0'}</h3>
-                    <small className="text-muted">Quizzes Taken</small>
-                  </div>
+              </div>
+            </div>
+            <div className="col-md-3 mb-3">
+              <div className="card border-0 shadow-sm text-center">
+                <div className="card-body">
+                  <h3 className="text-warning mb-2">{stats.studentsHelped}</h3>
+                  <p className="text-muted small mb-0">Students Helped</p>
                 </div>
-              </Card.Body>
-            </Card>
-          </Col>
-
-          <Col md={3}>
-            <Card className="stats-card border-0 shadow-sm h-100">
-              <Card.Body>
-                <div className="d-flex align-items-center">
-                  <div className="stats-icon bg-info-light">
-                    <FaTrophy className="text-info" size={24} />
-                  </div>
-                  <div className="ms-3">
-                    <h3 className="mb-0">{stats.recommendationsReceived ? '5' : '0'}</h3>
-                    <small className="text-muted">Recommendations</small>
-                  </div>
+              </div>
+            </div>
+            <div className="col-md-3 mb-3">
+              <div className="card border-0 shadow-sm text-center">
+                <div className="card-body">
+                  <h3 className="text-info mb-2">₹{stats.earnings}</h3>
+                  <p className="text-muted small mb-0">Total Earnings</p>
                 </div>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
-        {/* Profile Completion */}
-        <Row className="mb-4">
-          <Col>
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <div>
-                    <h5 className="mb-1">Complete Your Profile</h5>
-                    <small className="text-muted">
-                      Complete your profile to get better recommendations
-                    </small>
-                  </div>
-                  <Badge bg="primary" className="fs-6">
-                    {stats.profileComplete}%
-                  </Badge>
-                </div>
-                <ProgressBar 
-                  now={stats.profileComplete} 
-                  variant="primary"
-                  className="mb-3"
-                  style={{ height: '10px' }}
-                />
-                <Button as={Link} to="/profile" variant="outline-primary" size="sm">
-                  Complete Profile
-                </Button>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-
-        {/* Quick Actions */}
-        <Row className="mb-4">
-          <Col>
-            <h4 className="mb-3">Quick Actions</h4>
-          </Col>
-        </Row>
-
-        <Row className="g-4 mb-4">
-          {quickActions.map((action, index) => (
-            <Col md={6} lg={3} key={index}>
-              <Card className="quick-action-card h-100 text-center border-0 shadow-sm">
-                <Card.Body className="p-4">
-                  <div className={`action-icon bg-${action.color}-light mb-3`}>
-                    <action.icon size={40} className={`text-${action.color}`} />
-                  </div>
-                  <h5>{action.title}</h5>
-                  <p className="text-muted small mb-3">{action.description}</p>
-                  <Button 
-                    as={Link} 
-                    to={action.link} 
-                    variant={action.color}
-                    size="sm"
-                    className="w-100"
-                  >
-                    {action.buttonText}
-                  </Button>
-                </Card.Body>
-              </Card>
-            </Col>
-          ))}
-        </Row>
-
-        {/* Recent Activity */}
-        <Row>
-          <Col lg={8}>
-            <Card className="border-0 shadow-sm">
-              <Card.Header className="bg-white border-bottom">
-                <h5 className="mb-0">Recent Activity</h5>
-              </Card.Header>
-              <Card.Body className="p-0">
-                <ListGroup variant="flush">
-                  {recentActivities.map((activity) => (
-                    <ListGroup.Item key={activity.id} className="py-3">
-                      <div className="d-flex align-items-center">
-                        <div className={`activity-icon bg-${activity.color}-light me-3`}>
-                          <activity.icon className={`text-${activity.color}`} />
-                        </div>
-                        <div className="flex-grow-1">
-                          <p className="mb-0">{activity.text}</p>
-                          <small className="text-muted">
-                            <FaClock className="me-1" />
-                            {activity.time}
-                          </small>
-                        </div>
-                      </div>
-                    </ListGroup.Item>
-                  ))}
-                </ListGroup>
-              </Card.Body>
-            </Card>
-          </Col>
-
-          {/* Next Steps */}
-          <Col lg={4}>
-            <Card className="border-0 shadow-sm">
-              <Card.Header className="bg-white border-bottom">
-                <h5 className="mb-0">Next Steps</h5>
-              </Card.Header>
-              <Card.Body>
-                <ListGroup variant="flush" className="border-0">
-                  <ListGroup.Item className="px-0 border-0">
-                    <div className="form-check">
-                      <input 
-                        className="form-check-input" 
-                        type="checkbox" 
-                        checked={stats.profileComplete === 100}
-                        readOnly
-                      />
-                      <label className="form-check-label">
-                        Complete your profile
-                      </label>
-                    </div>
-                  </ListGroup.Item>
-                  <ListGroup.Item className="px-0 border-0">
-                    <div className="form-check">
-                      <input 
-                        className="form-check-input" 
-                        type="checkbox"
-                        checked={stats.quizCompleted}
-                        readOnly
-                      />
-                      <label className="form-check-label">
-                        Take aptitude quiz
-                      </label>
-                    </div>
-                  </ListGroup.Item>
-                  <ListGroup.Item className="px-0 border-0">
-                    <div className="form-check">
-                      <input 
-                        className="form-check-input" 
-                        type="checkbox"
-                        checked={stats.chatSessions > 0}
-                        readOnly
-                      />
-                      <label className="form-check-label">
-                        Chat with AI counselor
-                      </label>
-                    </div>
-                  </ListGroup.Item>
-                  <ListGroup.Item className="px-0 border-0">
-                    <div className="form-check">
-                      <input 
-                        className="form-check-input" 
-                        type="checkbox"
-                        checked={stats.recommendationsReceived}
-                        readOnly
-                      />
-                      <label className="form-check-label">
-                        Get career recommendations
-                      </label>
-                    </div>
-                  </ListGroup.Item>
-                </ListGroup>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      </Container>
+        {/* Render appropriate dashboard based on role */}
+        {isCounsellor ? <CounsellorDashboard /> : <StudentDashboard />}
+      </div>
     </div>
   );
-};
+}
 
 export default Dashboard;

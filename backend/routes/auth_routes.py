@@ -5,8 +5,6 @@ import jwt
 from bson import ObjectId
 import re
 
-from models.schemas import UserModel
-
 auth_bp = Blueprint('auth', __name__)
 
 # Helper functions
@@ -23,7 +21,7 @@ def generate_token(user_id, role):
     payload = {
         'user_id': str(user_id),
         'role': role,
-        'exp': datetime.utcnow() + timedelta(days=7),  # Token expires in 7 days
+        'exp': datetime.utcnow() + timedelta(days=7),
         'iat': datetime.utcnow()
     }
     return jwt.encode(payload, current_app.config['SECRET_KEY'], algorithm='HS256')
@@ -35,21 +33,59 @@ def validate_email(email):
 
 def validate_password(password):
     """Validate password strength"""
-    if len(password) < 6:
-        return False, "Password must be at least 6 characters long"
+    if len(password) < 8:
+        return False, "Password must be at least 8 characters long"
+    
+    if not re.search(r'[A-Z]', password):
+        return False, "Password must contain at least one uppercase letter"
+    
+    if not re.search(r'[a-z]', password):
+        return False, "Password must contain at least one lowercase letter"
+    
+    if not re.search(r'[0-9]', password):
+        return False, "Password must contain at least one number"
+    
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        return False, "Password must contain at least one special character"
+    
     return True, ""
 
 # Routes
 @auth_bp.route('/register', methods=['POST'])
 def register():
     """
-    Register a new user
+    Register a new user (student or counsellor)
     POST /api/auth/register
-    Body: { "name": "John Doe", "email": "john@example.com", "password": "password123", "role": "student" }
     """
     try:
         db = current_app.config['DB']
         data = request.json
+        # DEBUG - See what we receive
+        print("\n" + "=" * 80)
+        print("🔍 BACKEND RECEIVED:")
+        import json
+        print(json.dumps(data, indent=2, default=str))
+        
+        print("\n📋 PROFILE CHECK:")
+        if 'profile' in data:
+            print(f"✅ Profile exists: {data['profile']}")
+            if 'specialization' in data['profile']:
+                print(f"✅ Specialization: '{data['profile']['specialization']}'")
+            else:
+                print(f"❌ NO specialization in profile!")
+        else:
+            print(f"❌ NO profile in data!")
+        print("=" * 80 + "\n")
+        print("=" * 60)
+        print("📝 REGISTRATION REQUEST RECEIVED")
+        print(f"Role: {data.get('role')}")
+        print(f"Name: {data.get('name')}")
+        print(f"Email: {data.get('email')}")
+        print(f"Username: {data.get('username')}")
+        print(f"Has profile: {bool(data.get('profile'))}")
+        if data.get('profile'):
+            print(f"Profile data: {data.get('profile')}")
+        print("=" * 60)
         
         # Validate required fields
         required_fields = ['name', 'email', 'password']
@@ -66,31 +102,111 @@ def register():
         if not is_valid:
             return jsonify({'error': msg}), 400
         
-        # Check if user already exists
+        # Check if email already exists
         if db.users.find_one({'email': data['email'].lower()}):
             return jsonify({'error': 'Email already registered'}), 409
+        
+        # Check if username already exists
+        username = data.get('username')
+        if username:
+            if db.users.find_one({'username': username.lower()}):
+                return jsonify({'error': 'Username already taken'}), 409
         
         # Hash password
         hashed_password = hash_password(data['password'])
         
-        # Create user document
+        # Determine role
         role = data.get('role', 'student')
         if role not in ['student', 'counsellor', 'admin']:
             role = 'student'
         
-        user = UserModel.create_user(
-            name=data['name'],
-            email=data['email'],
-            password=hashed_password,
-            role=role
-        )
+        # Create base user document
+        user = {
+            'name': data['name'],
+            'email': data['email'].lower(),
+            'username': username.lower() if username else data['email'].split('@')[0].lower(),
+            'password': hashed_password,
+            'role': role,
+            'is_active': True,
+            'created_at': datetime.utcnow(),
+            'updated_at': datetime.utcnow()
+        }
+        
+        # Add role-specific fields
+        if role == 'counsellor':
+            print("🔍 Processing COUNSELLOR registration...")
+            
+            # Validate counsellor-specific required fields
+            if not data.get('phone'):
+                return jsonify({'error': 'Phone number is required for counsellors'}), 400
+            
+            # Get profile data
+            profile = data.get('profile', {})
+            
+            print(f"🔍 Profile received: {profile}")
+            
+            # Validate required profile fields
+            if not profile.get('specialization'):
+                return jsonify({'error': 'Specialization is required for counsellors'}), 400
+            
+            if profile.get('experience') is None:
+                return jsonify({'error': 'Experience is required for counsellors'}), 400
+            
+            if not profile.get('education'):
+                return jsonify({'error': 'Education is required for counsellors'}), 400
+            
+            # Add counsellor fields
+            user['phone'] = data['phone']
+            user['profile'] = {
+                'specialization': profile['specialization'],
+                'experience': int(profile.get('experience', 0)),
+                'education': profile['education'],
+                'bio': profile.get('bio', ''),
+                'hourly_rate': int(profile.get('hourly_rate', 500)),
+                'rating': float(profile.get('rating', 4.5)),
+                'sessions_conducted': int(profile.get('sessions_conducted', 0))
+            }
+            
+            print(f"✅ Counsellor profile created:")
+            print(f"   Specialization: {user['profile']['specialization']}")
+            print(f"   Experience: {user['profile']['experience']} years")
+            print(f"   Education: {user['profile']['education']}")
+            print(f"   Hourly Rate: ₹{user['profile']['hourly_rate']}")
+            
+        elif role == 'student':
+            print("🔍 Processing STUDENT registration...")
+            
+            # Add student-specific fields
+            user['dob'] = data.get('dob')
+            user['class_level'] = data.get('class_level')
+            user['school'] = data.get('school')
+            user['location'] = data.get('location')
+            user['profile'] = {
+                'interests': data.get('interests', []),
+                'goals': data.get('goals', ''),
+                'subjects': data.get('subjects', []),
+                'skills': data.get('skills', [])
+            }
+            
+            print(f"✅ Student profile created:")
+            print(f"   Class: {user.get('class_level', 'Not specified')}")
+            print(f"   School: {user.get('school', 'Not specified')}")
         
         # Insert into database
         result = db.users.insert_one(user)
         user_id = result.inserted_id
         
+        print(f"✅ User inserted into database with ID: {user_id}")
+        
         # Generate token
         token = generate_token(user_id, role)
+        
+        # Return response (exclude password)
+        del user['password']
+        user['_id'] = str(user_id)
+        
+        print(f"✅ Registration successful for: {user['email']}")
+        print("=" * 60)
         
         return jsonify({
             'message': 'User registered successfully',
@@ -99,9 +215,69 @@ def register():
                 'id': str(user_id),
                 'name': user['name'],
                 'email': user['email'],
+                'username': user['username'],
                 'role': user['role']
             }
         }), 201
+        
+    except Exception as e:
+        print(f"❌ REGISTRATION ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@auth_bp.route('/check-username', methods=['POST'])
+def check_username():
+    """
+    Check if username is available
+    POST /api/auth/check-username
+    Body: { "username": "johndoe" }
+    """
+    try:
+        db = current_app.config['DB']
+        data = request.json
+        
+        username = data.get('username', '').lower()
+        
+        if not username or len(username) < 3:
+            return jsonify({'available': False, 'message': 'Username must be at least 3 characters'}), 200
+        
+        # Check if username exists
+        exists = db.users.find_one({'username': username}) is not None
+        
+        return jsonify({
+            'available': not exists,
+            'message': 'Username is available' if not exists else 'Username is already taken'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@auth_bp.route('/check-email', methods=['POST'])
+def check_email():
+    """
+    Check if email is available
+    POST /api/auth/check-email
+    Body: { "email": "john@example.com" }
+    """
+    try:
+        db = current_app.config['DB']
+        data = request.json
+        
+        email = data.get('email', '').lower()
+        
+        if not email or not validate_email(email):
+            return jsonify({'available': False, 'message': 'Invalid email format'}), 200
+        
+        # Check if email exists
+        exists = db.users.find_one({'email': email}) is not None
+        
+        return jsonify({
+            'available': not exists,
+            'message': 'Email is available' if not exists else 'Email is already registered'
+        }), 200
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -112,7 +288,7 @@ def login():
     """
     Login user
     POST /api/auth/login
-    Body: { "email": "john@example.com", "password": "password123" }
+    Body: { "login": "john@example.com", "password": "password123" }
     """
     try:
         db = current_app.config['DB']
@@ -120,10 +296,17 @@ def login():
         
         # Validate required fields
         if not data.get('login') or not data.get('password'):
-            return jsonify({'error': 'Email and password are required'}), 400
+            return jsonify({'error': 'Email/Username and password are required'}), 400
         
-        # Find user
-        user = db.users.find_one({'email': data['email'].lower()})
+        # Find user by email or username
+        login_input = data['login'].lower()
+        
+        user = db.users.find_one({
+            "$or": [
+                {"email": login_input},
+                {"username": login_input}
+            ]
+        })
         
         if not user:
             return jsonify({'error': 'Invalid credentials'}), 401
@@ -145,6 +328,8 @@ def login():
         # Generate token
         token = generate_token(user['_id'], user['role'])
         
+        print(f"✅ Login successful: {user['email']} (Role: {user['role']})")
+        
         return jsonify({
             'message': 'Login successful',
             'token': token,
@@ -152,69 +337,13 @@ def login():
                 'id': str(user['_id']),
                 'name': user['name'],
                 'email': user['email'],
+                'username': user.get('username', ''),
                 'role': user['role']
             }
         }), 200
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@auth_bp.route('/forgot-password', methods=['POST'])
-def forgot_password():
-    """
-    Request password reset
-    POST /api/auth/forgot-password
-    Body: { "email": "john@example.com" }
-    """
-    try:
-        db = current_app.config['DB']
-        data = request.json
-        
-        if not data.get('email'):
-            return jsonify({'error': 'Email is required'}), 400
-        
-        # Check if user exists
-        user = db.users.find_one({'email': data['email'].lower()})
-        
-        # Always return success to prevent email enumeration
-        # In production, send actual reset email here
-        return jsonify({
-            'message': 'If the email exists, a password reset link has been sent'
-        }), 200
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@auth_bp.route('/reset-password', methods=['POST'])
-def reset_password():
-    """
-    Reset password with token
-    POST /api/auth/reset-password
-    Body: { "token": "reset_token", "new_password": "newpass123" }
-    """
-    try:
-        db = current_app.config['DB']
-        data = request.json
-        
-        # Validate required fields
-        if not data.get('token') or not data.get('new_password'):
-            return jsonify({'error': 'Token and new password are required'}), 400
-        
-        # Validate new password
-        is_valid, msg = validate_password(data['new_password'])
-        if not is_valid:
-            return jsonify({'error': msg}), 400
-        
-        # In production, verify reset token here
-        # For now, we'll use a simple implementation
-        
-        return jsonify({
-            'message': 'Password reset functionality will be implemented with email service'
-        }), 501
-        
-    except Exception as e:
+        print(f"❌ Login error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 
