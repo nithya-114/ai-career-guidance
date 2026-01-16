@@ -1,17 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Container, Row, Col, Card, Badge, Button, ListGroup, Spinner, Alert } from 'react-bootstrap';
-import { FaArrowLeft, FaBriefcase, FaMoneyBillWave, FaGraduationCap, FaChartLine, FaLightbulb, FaUserTie, FaBook } from 'react-icons/fa';
+import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import './CareerDetails.css';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-
-function CareerDetails() {
+const CareerDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [career, setCareer] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchCareerDetails();
@@ -20,291 +17,289 @@ function CareerDetails() {
   const fetchCareerDetails = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/careers/${id}`);
+      const response = await axios.get(`http://localhost:5000/api/careers/${id}`);
       setCareer(response.data);
-      setError('');
     } catch (err) {
       console.error('Error fetching career details:', err);
-      setError('Failed to load career details.');
-      // Mock data for demo
-      setMockCareer();
+      setError('Failed to load career details');
     } finally {
       setLoading(false);
     }
   };
 
-  const setMockCareer = () => {
-    const mockData = {
-      _id: id,
-      name: 'Software Engineer',
-      category: 'Technology',
-      description: 'Software engineers design, develop, test, and maintain software applications and systems. They work with programming languages, frameworks, and tools to create solutions that meet user needs. This role involves problem-solving, collaboration with teams, and continuous learning to stay updated with technology trends.',
-      detailed_description: 'Software engineering is one of the most dynamic and rewarding career paths in technology. As a software engineer, you\'ll be at the forefront of innovation, creating applications and systems that power businesses and improve lives. The role requires strong analytical thinking, creativity, and the ability to work both independently and as part of a team.',
-      salary_range: '₹4-25 LPA',
-      required_education: ['B.Tech Computer Science', 'BCA', 'MCA', 'B.Sc Computer Science'],
-      required_skills: ['Programming', 'Problem-solving', 'Analytical thinking', 'Communication', 'Team collaboration'],
-      personality_traits: ['Analytical', 'Detail-oriented', 'Creative', 'Patient', 'Curious'],
-      interests: ['Technology', 'Problem-solving', 'Innovation', 'Continuous learning'],
-      work_environment: 'Office/Remote',
-      job_outlook: 'Excellent - High demand with 22% growth expected',
-      growth_prospects: 'Excellent',
-      typical_day: [
-        'Attend daily stand-up meetings',
-        'Write and review code',
-        'Debug and fix issues',
-        'Collaborate with team members',
-        'Test new features',
-        'Documentation and planning'
-      ],
-      career_path: [
-        'Junior Software Engineer (0-2 years)',
-        'Software Engineer (2-5 years)',
-        'Senior Software Engineer (5-8 years)',
-        'Lead Engineer/Architect (8+ years)',
-        'Engineering Manager/CTO'
-      ],
-      related_careers: ['Data Scientist', 'DevOps Engineer', 'Full Stack Developer', 'Mobile App Developer']
-    };
-    setCareer(mockData);
+  // Helper function to convert career_path string to array
+  const getCareerPathArray = (careerPath) => {
+    if (!careerPath) return [];
+    
+    // If it's already an array, return it
+    if (Array.isArray(careerPath)) {
+      return careerPath;
+    }
+    
+    // If it's a string, split it
+    if (typeof careerPath === 'string') {
+      // Split by arrow symbols or commas
+      return careerPath
+        .split(/[→,]/)
+        .map(step => step.trim())
+        .filter(step => step.length > 0);
+    }
+    
+    return [];
+  };
+
+  // Helper function to ensure array
+  const ensureArray = (value) => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') return [value];
+    return [];
   };
 
   if (loading) {
     return (
-      <Container className="py-5 text-center">
-        <Spinner animation="border" variant="primary" />
-        <p className="mt-3">Loading career details...</p>
-      </Container>
+      <div className="career-details-loading">
+        <div className="spinner"></div>
+        <p>Loading career details...</p>
+      </div>
     );
   }
 
   if (error || !career) {
     return (
-      <Container className="py-5">
-        <Alert variant="danger">
-          {error || 'Career not found.'}
-          <div className="mt-3">
-            <Button variant="primary" onClick={() => navigate('/careers')}>
-              Back to Career Listing
-            </Button>
-          </div>
-        </Alert>
-      </Container>
+      <div className="career-details-error">
+        <h2>Error</h2>
+        <p>{error || 'Career not found'}</p>
+        <button onClick={() => navigate('/careers')} className="btn-back">
+          ← Back to Careers
+        </button>
+      </div>
     );
   }
 
+  const careerPathSteps = getCareerPathArray(career.career_path);
+  const skills = ensureArray(career.skills);
+  const topCompanies = ensureArray(career.top_companies);
+  const entranceExams = ensureArray(career.entrance_exams);
+  const topColleges = ensureArray(career.top_colleges);
+  const dayToDay = ensureArray(career.day_to_day);
+  const pros = ensureArray(career.pros);
+  const cons = ensureArray(career.cons);
+
   return (
-    <div className="career-details-page">
+    <div className="career-details-container">
       {/* Header */}
-      <div className="career-details-header bg-primary text-white py-4">
-        <Container>
-          <Button
-            variant="light"
-            size="sm"
-            className="mb-3"
-            onClick={() => navigate('/careers')}
-          >
-            <FaArrowLeft className="me-2" />
-            Back to Careers
-          </Button>
-          <div className="d-flex align-items-start justify-content-between">
-            <div>
-              <Badge bg="light" text="dark" className="mb-2">
-                {career.category}
-              </Badge>
-              <h1 className="display-5 mb-2">{career.name}</h1>
-              <p className="lead mb-0">{career.description}</p>
+      <div className="career-details-header">
+        <button onClick={() => navigate('/careers')} className="btn-back">
+          ← Back to Careers
+        </button>
+        
+        <div className="career-header-content">
+          <span className="career-category-badge">{career.category}</span>
+          <h1 className="career-title">{career.title || career.name}</h1>
+          <p className="career-description">{career.description}</p>
+          
+          <div className="career-quick-stats">
+            <div className="stat-item">
+              <span className="stat-icon">💰</span>
+              <div>
+                <span className="stat-label">Salary Range</span>
+                <span className="stat-value">{career.salary_range}</span>
+              </div>
             </div>
-            <FaBriefcase size={50} />
+            
+            <div className="stat-item">
+              <span className="stat-icon">📈</span>
+              <div>
+                <span className="stat-label">Growth Potential</span>
+                <span className="stat-value">{career.growth_potential}</span>
+              </div>
+            </div>
+            
+            <div className="stat-item">
+              <span className="stat-icon">💼</span>
+              <div>
+                <span className="stat-label">Job Outlook</span>
+                <span className="stat-value">{career.job_outlook}</span>
+              </div>
+            </div>
+
+            <div className="stat-item">
+              <span className="stat-icon">📍</span>
+              <div>
+                <span className="stat-label">Work Environment</span>
+                <span className="stat-value">{career.work_environment}</span>
+              </div>
+            </div>
           </div>
-        </Container>
+        </div>
       </div>
 
-      <Container className="py-4">
-        <Row className="g-4">
-          {/* Main Content */}
-          <Col lg={8}>
-            {/* Overview */}
-            <Card className="mb-4 shadow-sm">
-              <Card.Body>
-                <h4 className="mb-3">
-                  <FaBook className="me-2 text-primary" />
-                  Overview
-                </h4>
-                <p>{career.detailed_description || career.description}</p>
-              </Card.Body>
-            </Card>
+      {/* Main Content */}
+      <div className="career-details-content">
+        {/* About Section */}
+        {career.detailed_description && (
+          <section className="details-section">
+            <h2>📖 About This Career</h2>
+            <p className="detailed-description">{career.detailed_description}</p>
+          </section>
+        )}
 
-            {/* Required Skills */}
-            <Card className="mb-4 shadow-sm">
-              <Card.Body>
-                <h4 className="mb-3">
-                  <FaLightbulb className="me-2 text-warning" />
-                  Required Skills
-                </h4>
-                <div className="d-flex flex-wrap gap-2">
-                  {career.required_skills?.map((skill, index) => (
-                    <Badge key={index} bg="primary" className="px-3 py-2">
-                      {skill}
-                    </Badge>
+        {/* Education Requirements */}
+        <section className="details-section">
+          <h2>🎓 Education Requirements</h2>
+          <div className="education-content">
+            <div className="education-item">
+              <h3>Required Education</h3>
+              <p>{career.education}</p>
+            </div>
+            
+            {entranceExams.length > 0 && (
+              <div className="education-item">
+                <h3>Entrance Exams</h3>
+                <div className="tag-list">
+                  {entranceExams.map((exam, index) => (
+                    <span key={index} className="tag exam-tag">{exam}</span>
                   ))}
                 </div>
-              </Card.Body>
-            </Card>
-
-            {/* Personality Traits */}
-            <Card className="mb-4 shadow-sm">
-              <Card.Body>
-                <h4 className="mb-3">
-                  <FaUserTie className="me-2 text-info" />
-                  Ideal Personality Traits
-                </h4>
-                <div className="d-flex flex-wrap gap-2">
-                  {career.personality_traits?.map((trait, index) => (
-                    <Badge key={index} bg="info" className="px-3 py-2">
-                      {trait}
-                    </Badge>
+              </div>
+            )}
+            
+            {topColleges.length > 0 && (
+              <div className="education-item">
+                <h3>Top Colleges</h3>
+                <ul className="colleges-list">
+                  {topColleges.map((college, index) => (
+                    <li key={index}>
+                      🏛️ {college}
+                    </li>
                   ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Skills Required */}
+        {skills.length > 0 && (
+          <section className="details-section">
+            <h2>🏆 Skills Required</h2>
+            <div className="skills-grid">
+              {skills.map((skill, index) => (
+                <div key={index} className="skill-card">
+                  ✓ <span>{skill}</span>
                 </div>
-              </Card.Body>
-            </Card>
+              ))}
+            </div>
+          </section>
+        )}
 
-            {/* Typical Day */}
-            {career.typical_day && (
-              <Card className="mb-4 shadow-sm">
-                <Card.Body>
-                  <h4 className="mb-3">A Day in the Life</h4>
-                  <ListGroup variant="flush">
-                    {career.typical_day.map((activity, index) => (
-                      <ListGroup.Item key={index}>
-                        <span className="text-primary me-2">✓</span>
-                        {activity}
-                      </ListGroup.Item>
-                    ))}
-                  </ListGroup>
-                </Card.Body>
-              </Card>
-            )}
-
-            {/* Career Path */}
-            {career.career_path && (
-              <Card className="mb-4 shadow-sm">
-                <Card.Body>
-                  <h4 className="mb-3">
-                    <FaChartLine className="me-2 text-success" />
-                    Career Progression
-                  </h4>
-                  <div className="career-path">
-                    {career.career_path.map((stage, index) => (
-                      <div key={index} className="career-stage mb-3 ps-3">
-                        <div className="d-flex align-items-center">
-                          <div className="stage-number me-3">
-                            <Badge bg="success" className="rounded-circle" style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              {index + 1}
-                            </Badge>
-                          </div>
-                          <div>
-                            <strong>{stage}</strong>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+        {/* Career Path */}
+        {careerPathSteps.length > 0 && (
+          <section className="details-section">
+            <h2>📈 Career Progression</h2>
+            <div className="career-path">
+              {careerPathSteps.map((step, index) => (
+                <React.Fragment key={index}>
+                  <div className="career-path-step">
+                    <div className="step-number">{index + 1}</div>
+                    <div className="step-content">
+                      <h4>{step}</h4>
+                    </div>
                   </div>
-                </Card.Body>
-              </Card>
-            )}
+                  {index < careerPathSteps.length - 1 && (
+                    <div className="career-path-arrow">→</div>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+          </section>
+        )}
 
-            {/* Related Careers */}
-            {career.related_careers && career.related_careers.length > 0 && (
-              <Card className="shadow-sm">
-                <Card.Body>
-                  <h4 className="mb-3">Related Careers</h4>
-                  <div className="d-flex flex-wrap gap-2">
-                    {career.related_careers.map((relatedCareer, index) => (
-                      <Badge key={index} bg="light" text="dark" className="px-3 py-2">
-                        {relatedCareer}
-                      </Badge>
-                    ))}
-                  </div>
-                </Card.Body>
-              </Card>
-            )}
-          </Col>
+        {/* Day to Day Activities */}
+        {dayToDay.length > 0 && (
+          <section className="details-section">
+            <h2>⏰ Day-to-Day Activities</h2>
+            <ul className="activity-list">
+              {dayToDay.map((activity, index) => (
+                <li key={index}>
+                  ✓ {activity}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
-          {/* Sidebar */}
-          <Col lg={4}>
-            {/* Key Information */}
-            <Card className="mb-4 shadow-sm sticky-top" style={{ top: '20px' }}>
-              <Card.Header className="bg-primary text-white">
-                <h5 className="mb-0">Key Information</h5>
-              </Card.Header>
-              <ListGroup variant="flush">
-                <ListGroup.Item>
-                  <div className="d-flex align-items-center mb-2">
-                    <FaMoneyBillWave className="text-success me-2" />
-                    <strong>Salary Range</strong>
-                  </div>
-                  <p className="mb-0 text-muted">{career.salary_range}</p>
-                </ListGroup.Item>
+        {/* Top Companies */}
+        {topCompanies.length > 0 && (
+          <section className="details-section">
+            <h2>🏢 Top Companies</h2>
+            <div className="companies-grid">
+              {topCompanies.map((company, index) => (
+                <div key={index} className="company-card">
+                  🏢 <span>{company}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
-                <ListGroup.Item>
-                  <div className="d-flex align-items-center mb-2">
-                    <FaGraduationCap className="text-info me-2" />
-                    <strong>Required Education</strong>
-                  </div>
-                  <ul className="mb-0">
-                    {career.required_education?.map((edu, index) => (
-                      <li key={index} className="text-muted">{edu}</li>
+        {/* Pros and Cons */}
+        {(pros.length > 0 || cons.length > 0) && (
+          <section className="details-section">
+            <h2>⚖️ Pros and Cons</h2>
+            <div className="pros-cons-grid">
+              {pros.length > 0 && (
+                <div className="pros-section">
+                  <h3>✅ Advantages</h3>
+                  <ul>
+                    {pros.map((pro, index) => (
+                      <li key={index}>
+                        ✓ {pro}
+                      </li>
                     ))}
                   </ul>
-                </ListGroup.Item>
-
-                <ListGroup.Item>
-                  <div className="d-flex align-items-center mb-2">
-                    <FaBriefcase className="text-primary me-2" />
-                    <strong>Work Environment</strong>
-                  </div>
-                  <p className="mb-0 text-muted">{career.work_environment}</p>
-                </ListGroup.Item>
-
-                <ListGroup.Item>
-                  <div className="d-flex align-items-center mb-2">
-                    <FaChartLine className="text-success me-2" />
-                    <strong>Job Outlook</strong>
-                  </div>
-                  <p className="mb-0 text-muted">{career.job_outlook || 'Positive growth expected'}</p>
-                </ListGroup.Item>
-
-                <ListGroup.Item>
-                  <div className="d-flex align-items-center mb-2">
-                    <strong>Growth Prospects</strong>
-                  </div>
-                  <Badge bg="success">{career.growth_prospects}</Badge>
-                </ListGroup.Item>
-              </ListGroup>
-            </Card>
-
-            {/* Call to Action */}
-            <Card className="shadow-sm bg-light border-0">
-              <Card.Body className="text-center">
-                <h5 className="mb-3">Interested in this career?</h5>
-                <div className="d-grid gap-2">
-                  <Button as={Link} to="/recommendations" variant="primary">
-                    Get Personalized Match
-                  </Button>
-                  <Button as={Link} to="/colleges" variant="outline-primary">
-                    Find Related Colleges
-                  </Button>
-                  <Button as={Link} to="/counsellors" variant="outline-primary">
-                    Talk to a Counsellor
-                  </Button>
                 </div>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      </Container>
+              )}
+              
+              {cons.length > 0 && (
+                <div className="cons-section">
+                  <h3>⚠️ Challenges</h3>
+                  <ul>
+                    {cons.map((con, index) => (
+                      <li key={index}>
+                        • {con}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* Call to Action */}
+        <section className="details-section cta-section">
+          <h2>🚀 Ready to Pursue This Career?</h2>
+          <p>Take our comprehensive career assessment to see if this career is right for you.</p>
+          <div className="cta-buttons">
+            <button 
+              className="btn-primary"
+              onClick={() => navigate('/quiz')}
+            >
+              📝 Take Career Quiz
+            </button>
+            <button 
+              className="btn-secondary"
+              onClick={() => navigate('/counsellors')}
+            >
+              👥 Talk to a Counsellor
+            </button>
+          </div>
+        </section>
+      </div>
     </div>
   );
-}
+};
 
 export default CareerDetails;

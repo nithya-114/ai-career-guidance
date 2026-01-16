@@ -13,7 +13,7 @@ import jwt
 import os
 import re
 from dotenv import load_dotenv
-
+from quiz_api import quiz_bp
 # Load environment variables
 load_dotenv()
 
@@ -1066,5 +1066,5 @@ if __name__ == '__main__':
     print(f"\n🌐 Server: http://localhost:{port}")
     print(f"🏥 Health: http://localhost:{port}/api/health")
     print("=" * 60 + "\n")
-    
+    app.register_blueprint(quiz_bp) 
     app.run(host='0.0.0.0', port=port, debug=debug)

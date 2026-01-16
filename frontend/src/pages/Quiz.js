@@ -17,6 +17,8 @@ function Quiz() {
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(null);
+  const [results, setResults] = useState(null);
+  const [showResults, setShowResults] = useState(false);
 
   useEffect(() => {
     if (quizStarted && timeRemaining > 0) {
@@ -36,16 +38,20 @@ function Quiz() {
     try {
       const response = await axios.get(`${API_URL}/quiz/${type}/questions`);
       setQuestions(response.data.questions || []);
-    } catch (error) {
-      console.error('Error loading quiz:', error);
-      // Use mock data
-      setMockQuestions(type);
-    } finally {
-      setLoading(false);
       setQuizStarted(true);
       if (type === 'aptitude') {
         setTimeRemaining(20 * 60); // 20 minutes for aptitude
       }
+    } catch (error) {
+      console.error('Error loading quiz:', error);
+      // Use mock data
+      setMockQuestions(type);
+      setQuizStarted(true);
+      if (type === 'aptitude') {
+        setTimeRemaining(20 * 60);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -145,6 +151,7 @@ function Quiz() {
 
   const handleSubmitQuiz = async () => {
     setLoading(true);
+    setQuizCompleted(true);
     
     try {
       const token = localStorage.getItem('token');
@@ -160,15 +167,17 @@ function Quiz() {
         }
       );
       
-      // Navigate to results
-      navigate('/quiz/results', { state: { results: response.data } });
+      // Store results and show them
+      setResults(response.data);
+      setShowResults(true);
     } catch (error) {
       console.error('Error submitting quiz:', error);
-      // For demo, show completion
-      setQuizCompleted(true);
-      setTimeout(() => {
-        navigate('/recommendations');
-      }, 2000);
+      // Show mock results
+      setResults({
+        score: { correct: 3, total: 5, percentage: 60 },
+        recommendations: []
+      });
+      setShowResults(true);
     } finally {
       setLoading(false);
     }
@@ -184,6 +193,88 @@ function Quiz() {
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+  // Results Screen
+  if (showResults && results) {
+    return (
+      <Container className="quiz-page py-5">
+        <Card className="shadow-sm">
+          <Card.Body className="p-5 text-center">
+            <div className="mb-4">
+              <FaCheckCircle size={80} className="text-success mb-3" />
+              <h2 className="mb-3">Quiz Completed!</h2>
+            </div>
+
+            {results.score && (
+              <div className="mb-4">
+                <h4>Your Score</h4>
+                <div className="display-4 text-primary mb-3">
+                  {results.score.percentage}%
+                </div>
+                <p className="text-muted">
+                  {results.score.correct} correct out of {results.score.total} questions
+                </p>
+              </div>
+            )}
+
+            {results.recommendations && results.recommendations.length > 0 && (
+              <div className="mb-4">
+                <h4 className="mb-3">Recommended Careers</h4>
+                <Row className="g-3">
+                  {results.recommendations.map((rec, index) => (
+                    <Col md={6} key={index}>
+                      <Card className="h-100">
+                        <Card.Body>
+                          <h5>{rec.career_name}</h5>
+                          <Badge bg="info" className="mb-2">{rec.category}</Badge>
+                          <p className="mb-2">Match Score: <strong>{rec.match_score}%</strong></p>
+                          <Button 
+                            size="sm" 
+                            variant="outline-primary"
+                            onClick={() => navigate(`/careers/${rec.career_id}`)}
+                          >
+                            View Details
+                          </Button>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
+              </div>
+            )}
+
+            <div className="mt-4">
+              <Button 
+                variant="primary" 
+                size="lg" 
+                className="me-3"
+                onClick={() => navigate('/careers')}
+              >
+                Explore All Careers
+              </Button>
+              <Button 
+                variant="outline-secondary" 
+                size="lg"
+                onClick={() => {
+                  setQuizType(null);
+                  setQuestions([]);
+                  setCurrentQuestion(0);
+                  setAnswers({});
+                  setQuizStarted(false);
+                  setQuizCompleted(false);
+                  setResults(null);
+                  setShowResults(false);
+                  setTimeRemaining(null);
+                }}
+              >
+                Take Another Quiz
+              </Button>
+            </div>
+          </Card.Body>
+        </Card>
+      </Container>
+    );
+  }
 
   // Quiz Type Selection Screen
   if (!quizStarted && !quizType) {
@@ -214,7 +305,7 @@ function Quiz() {
                 </div>
 
                 <ul className="list-unstyled mb-4">
-                  <li className="mb-2">✓ 20 Questions</li>
+                  <li className="mb-2">✓ 10 Questions</li>
                   <li className="mb-2">✓ 20 Minutes</li>
                   <li className="mb-2">✓ Multiple Choice</li>
                   <li className="mb-2">✓ Logical & Numerical Reasoning</li>
@@ -248,7 +339,7 @@ function Quiz() {
                 </div>
 
                 <ul className="list-unstyled mb-4">
-                  <li className="mb-2">✓ 15 Questions</li>
+                  <li className="mb-2">✓ 10 Questions</li>
                   <li className="mb-2">✓ No Time Limit</li>
                   <li className="mb-2">✓ Situational Questions</li>
                   <li className="mb-2">✓ Career Personality Match</li>
@@ -280,20 +371,19 @@ function Quiz() {
     );
   }
 
-  // Quiz Completed Screen
-  if (quizCompleted) {
+  // Quiz Completed - Processing
+  if (quizCompleted && loading) {
     return (
       <Container className="quiz-page py-5 text-center">
         <div className="completion-animation mb-4">
-          <FaCheckCircle size={80} className="text-success" />
+          <div className="spinner-border text-primary" style={{width: '4rem', height: '4rem'}} role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
         </div>
-        <h2 className="mb-3">Quiz Completed!</h2>
+        <h2 className="mb-3">Processing Your Results...</h2>
         <p className="lead text-muted mb-4">
           Analyzing your responses and generating recommendations...
         </p>
-        <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </div>
       </Container>
     );
   }
@@ -302,6 +392,8 @@ function Quiz() {
   if (quizStarted && questions.length > 0) {
     const question = questions[currentQuestion];
     const progress = calculateProgress();
+    const isLastQuestion = currentQuestion === questions.length - 1;
+    const allQuestionsAnswered = Object.keys(answers).length === questions.length;
 
     return (
       <Container className="quiz-page py-4">
@@ -317,7 +409,7 @@ function Quiz() {
               {timeRemaining !== null && (
                 <div className="d-flex align-items-center">
                   <FaClock className="me-2" />
-                  <span className={timeRemaining < 60 ? 'text-warning' : ''}>
+                  <span className={timeRemaining < 60 ? 'text-warning fw-bold' : ''}>
                     {formatTime(timeRemaining)}
                   </span>
                 </div>
@@ -375,7 +467,7 @@ function Quiz() {
               </Button>
 
               <div>
-                {currentQuestion < questions.length - 1 ? (
+                {!isLastQuestion ? (
                   <Button
                     variant="primary"
                     onClick={handleNext}
@@ -388,7 +480,7 @@ function Quiz() {
                   <Button
                     variant="success"
                     onClick={handleSubmitQuiz}
-                    disabled={Object.keys(answers).length !== questions.length || loading}
+                    disabled={!allQuestionsAnswered || loading}
                   >
                     {loading ? 'Submitting...' : 'Submit Quiz'}
                     <FaCheckCircle className="ms-2" />
@@ -413,7 +505,7 @@ function Quiz() {
             <ul className="small mb-0">
               <li>Answer honestly for best results</li>
               <li>Don't overthink - go with your first instinct</li>
-              <li>You can go back and change answers</li>
+              <li>You can go back and change answers before submitting</li>
             </ul>
           </Card.Body>
         </Card>

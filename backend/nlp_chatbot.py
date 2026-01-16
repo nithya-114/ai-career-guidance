@@ -1,16 +1,16 @@
 """
-NLP Chatbot Module for Career Counselling
-Uses pattern matching and keyword detection for intent classification
-No heavy ML libraries needed - lightweight and fast!
+Enhanced NLP Chatbot Module for Career Counselling
+Detailed, helpful responses for students
 """
 
 import re
 from datetime import datetime
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional
+import random
 
 class CareerChatbot:
     """
-    Intelligent chatbot for career counselling using NLP techniques
+    Enhanced chatbot for career counselling with detailed responses
     """
     
     def __init__(self):
@@ -26,72 +26,38 @@ class CareerChatbot:
                 r'\b(bye|goodbye|see\s+you|talk\s+later|exit|quit)\b',
             ],
             'interests': [
-                r'\b(interest|like|enjoy|love|passionate|hobby|hobbies)\b',
-                r'\bwhat\s+do\s+i\s+like\b',
-            ],
-            'skills': [
-                r'\b(skill|talent|good\s+at|strength|ability|abilities)\b',
+                r'\b(interest|like|enjoy|love|passionate|hobby)\b',
             ],
             'careers': [
-                r'\b(career|job|profession|occupation|work|field)\b',
-                r'\bwhat\s+(should|can)\s+i\s+(be|do|become)\b',
+                r'\b(career|job|profession|suit\s+me|best\s+for\s+me)\b',
             ],
             'education': [
-                r'\b(college|university|course|degree|study|education|school)\b',
+                r'\b(college|university|course|degree|study)\b',
             ],
-            'quiz': [
-                r'\b(test|quiz|assessment|aptitude|personality)\b',
+            'confused': [
+                r'\b(confused|don\'t\s+know|help|lost|not\s+sure)\b',
             ],
-            'counsellor': [
-                r'\b(counsellor|counselor|expert|advisor|mentor|guide)\b',
-                r'\bbook\s+(appointment|session)\b',
-            ],
-            'help': [
-                r'\b(help|assist|support|guide|confused|lost)\b',
-            ],
-            'current_education': [
-                r'\b(10th|12th|undergraduate|graduate|diploma|studying)\b',
-            ],
-            'stream': [
-                r'\b(science|commerce|arts|engineering|medical|humanities)\b',
+            'salary': [
+                r'\b(salary|earn|income|pay)\b',
             ],
         }
         
         # Interest keywords
         self.interest_keywords = {
-            'technology': ['computer', 'programming', 'coding', 'software', 'tech', 'ai', 'ml', 'app', 'website'],
-            'science': ['physics', 'chemistry', 'biology', 'science', 'research', 'experiment', 'lab'],
-            'mathematics': ['math', 'mathematics', 'numbers', 'calculation', 'algebra', 'geometry'],
-            'arts': ['art', 'drawing', 'painting', 'creative', 'design', 'music', 'dance'],
-            'business': ['business', 'management', 'marketing', 'sales', 'entrepreneur'],
-            'healthcare': ['medicine', 'doctor', 'health', 'hospital', 'patient', 'medical'],
-            'teaching': ['teaching', 'education', 'teacher', 'professor', 'training'],
-            'sports': ['sports', 'fitness', 'athlete', 'exercise', 'physical'],
-            'writing': ['writing', 'author', 'journalism', 'content', 'blog'],
-        }
-        
-        # Skill keywords
-        self.skill_keywords = {
-            'analytical': ['analysis', 'analytical', 'data', 'research', 'investigate'],
-            'creative': ['creative', 'imagination', 'innovative', 'artistic', 'design'],
-            'communication': ['communication', 'speaking', 'presentation', 'writing'],
-            'leadership': ['leadership', 'management', 'team', 'organize', 'coordinate'],
-            'technical': ['technical', 'programming', 'engineering', 'building'],
-            'problem-solving': ['problem', 'solve', 'solution', 'fix', 'debug'],
+            'technology': ['computer', 'programming', 'coding', 'software', 'tech', 'ai', 'app', 'website'],
+            'medical': ['medicine', 'doctor', 'health', 'hospital', 'patient', 'medical'],
+            'engineering': ['engineer', 'mechanical', 'civil', 'electrical', 'building'],
+            'business': ['business', 'management', 'marketing', 'entrepreneur'],
         }
     
     def preprocess_text(self, text: str) -> str:
         """Clean and normalize text"""
-        text = text.lower().strip()
-        text = re.sub(r'[^\w\s]', ' ', text)  # Remove punctuation
-        text = re.sub(r'\s+', ' ', text)  # Remove extra spaces
-        return text
+        return text.lower().strip()
     
     def detect_intent(self, text: str) -> str:
         """Detect user intent from text"""
         text = self.preprocess_text(text)
         
-        # Check each intent pattern
         for intent, patterns in self.intent_patterns.items():
             for pattern in patterns:
                 if re.search(pattern, text, re.IGNORECASE):
@@ -112,269 +78,458 @@ class CareerChatbot:
         
         return list(set(interests))
     
-    def extract_skills(self, text: str) -> List[str]:
-        """Extract skills from user message"""
-        text = self.preprocess_text(text)
-        skills = []
-        
-        for skill, keywords in self.skill_keywords.items():
-            for keyword in keywords:
-                if keyword in text:
-                    skills.append(skill)
-                    break
-        
-        return list(set(skills))
-    
     def generate_response(self, user_message: str, user_profile: Optional[Dict] = None) -> Dict:
-        """
-        Generate intelligent response based on user message and context
+        """Generate intelligent response"""
         
-        Args:
-            user_message: User's message
-            user_profile: User's profile data (interests, skills, education)
-        
-        Returns:
-            Dict with response, intent, and extracted info
-        """
-        # Detect intent
         intent = self.detect_intent(user_message)
-        
-        # Extract interests and skills
         interests = self.extract_interests(user_message)
-        skills = self.extract_skills(user_message)
         
-        # Update context
-        if interests:
-            self.context['detected_interests'] = interests
-        if skills:
-            self.context['detected_skills'] = skills
-        
-        # Generate response based on intent
-        response = self._generate_intent_response(intent, user_message, user_profile)
-        
-        # Add to conversation history
-        self.conversation_history.append({
-            'user_message': user_message,
-            'bot_response': response,
-            'intent': intent,
-            'interests': interests,
-            'skills': skills,
-            'timestamp': datetime.utcnow().isoformat()
-        })
+        response = self._generate_intent_response(intent, user_message, interests)
         
         return {
             'response': response,
             'intent': intent,
-            'detected_interests': interests,
-            'detected_skills': skills,
             'suggestions': self._get_quick_replies(intent)
         }
     
-    def _generate_intent_response(self, intent: str, message: str, user_profile: Optional[Dict]) -> str:
-        """Generate response based on detected intent"""
+    def _generate_intent_response(self, intent: str, message: str, interests: List[str]) -> str:
+        """Generate detailed response based on intent"""
         
-        responses = {
-            'greeting': [
-                "Hello! I'm your AI Career Counselor. I'm here to help you discover your perfect career path. What would you like to explore today?",
-                "Hi there! Welcome to your career guidance journey. How can I assist you in finding your ideal career?",
-                "Hey! Great to see you. Let's work together to find the career that's perfect for you. Where should we start?"
-            ],
-            
-            'goodbye': [
-                "Goodbye! Feel free to come back anytime you need career guidance. Best of luck with your journey!",
-                "Take care! Remember, I'm always here to help with your career questions.",
-                "See you later! Don't hesitate to reach out when you need more guidance."
-            ],
-            
-            'interests': [
-                "Understanding your interests is crucial for finding the right career! Tell me more about what you're passionate about. For example:\n\n"
-                "• What subjects do you enjoy in school?\n"
-                "• What do you do in your free time?\n"
-                "• What topics make you excited to learn more?\n\n"
-                "Share as much as you'd like, and I'll help match you with suitable careers!",
-                
-                "Great question about interests! Your passions are key indicators of career satisfaction. "
-                "Are you drawn to technology, sciences, arts, business, or helping people? "
-                "Or maybe a combination? Tell me what makes you feel energized!"
-            ],
-            
-            'skills': [
-                "Skills are your superpowers! Let's identify what you're naturally good at. Consider these areas:\n\n"
-                "• Analytical thinking (solving problems, working with data)\n"
-                "• Creative thinking (designing, innovating, imagining)\n"
-                "• Communication (speaking, writing, presenting)\n"
-                "• Leadership (organizing, coordinating, managing)\n"
-                "• Technical abilities (building, programming, engineering)\n\n"
-                "Which of these resonate with you?",
-                
-                "Excellent! Knowing your skills helps us find careers where you'll excel. "
-                "Think about tasks that come naturally to you or that you perform better than others. "
-                "What would you say is your strongest skill?"
-            ],
-            
-            'careers': [
-                "I'd love to help you explore career options! To give you the most relevant suggestions, "
-                "I need to understand you better. Have you:\n\n"
-                "1. Taken our aptitude test? (Helps identify your strengths)\n"
-                "2. Completed the personality assessment? (Matches your work style)\n"
-                "3. Shared your interests with me?\n\n"
-                "The more I know about you, the better recommendations I can provide!",
-                
-                "Finding the right career is exciting! Based on what you've told me so far, "
-                "I can suggest some career paths. But first, could you tell me:\n\n"
-                "• What's your current education level?\n"
-                "• What subjects do you enjoy most?\n"
-                "• Do you prefer working with people, data, things, or ideas?"
-            ],
-            
-            'education': [
-                "Education is a crucial step in your career journey! Let me help you find the right path. "
-                "Could you tell me:\n\n"
-                "• What level are you at? (10th, 12th, Undergraduate, etc.)\n"
-                "• What stream interests you? (Science, Commerce, Arts)\n"
-                "• Any specific courses you're considering?\n\n"
-                "I can suggest the best colleges and courses for your career goals!",
-                
-                "Great that you're thinking about education! Your choice of course can significantly impact your career. "
-                "What's your preferred field of study? I can recommend courses and colleges that align with your interests."
-            ],
-            
-            'quiz': [
-                "Our assessments are designed to help you understand yourself better! We offer:\n\n"
-                "📝 Aptitude Test: Measures your abilities in different areas\n"
-                "🧠 Personality Assessment: Identifies your work style and preferences\n\n"
-                "Both tests take about 15-20 minutes each. Would you like to start with the aptitude test or personality assessment?",
-                
-                "Taking our assessments is highly recommended! They provide valuable insights that help us give you "
-                "personalized career recommendations. The results will show your strengths and ideal work environments. "
-                "Ready to begin?"
-            ],
-            
-            'counsellor': [
-                "Connecting with a professional counsellor is a great idea! Our expert counsellors can provide:\n\n"
-                "• One-on-one guidance sessions\n"
-                "• In-depth career planning\n"
-                "• Industry insights\n"
-                "• Education pathway advice\n\n"
-                "You can browse available counsellors and book a session that fits your schedule. "
-                "Would you like to see available counsellors?",
-                
-                "Our certified career counsellors are here to help! They bring years of experience in career guidance. "
-                "Sessions are available via video call or phone. To book an appointment, "
-                "head to the 'Book Counsellor' section. Any specific area you'd like to discuss with them?"
-            ],
-            
-            'help': [
-                "I'm here to help you every step of the way! Here's what I can assist you with:\n\n"
-                "🎯 Career Exploration: Discover careers that match your profile\n"
-                "📊 Assessments: Take aptitude and personality tests\n"
-                "🎓 Education: Find courses and colleges\n"
-                "💬 Counselling: Book sessions with experts\n"
-                "📝 Profile Building: Complete your career profile\n\n"
-                "What would you like to start with?",
-                
-                "No worries, I'm here to guide you! Career planning can feel overwhelming, but we'll break it down into simple steps. "
-                "Let's start with understanding your interests. What subjects or activities do you enjoy?"
-            ],
-            
-            'general': [
-                "I'm here to help you with your career planning! I can assist you with:\n\n"
-                "• Discovering careers that match your interests and skills\n"
-                "• Suggesting courses and colleges\n"
-                "• Providing information about different professions\n"
-                "• Helping you prepare for career decisions\n\n"
-                "What specific aspect would you like to explore?",
-                
-                "Thanks for reaching out! To provide you with the best guidance, could you tell me more about "
-                "what you're looking for? Are you interested in exploring career options, understanding required courses, "
-                "or learning about specific professions?"
-            ]
-        }
+        message_lower = message.lower()
         
-        # Get appropriate response
-        import random
-        response_list = responses.get(intent, responses['general'])
-        response = random.choice(response_list)
+        # GREETING
+        if intent == 'greeting':
+            return """Hello! 👋 I'm your AI Career Counsellor!
+
+I can help you with:
+🎯 **Career Guidance** - Discover careers matching your interests
+🏛️ **College Information** - Best colleges in Kerala
+📚 **Course Selection** - What to study after 10th/12th
+💡 **Career Planning** - Personalized roadmaps
+
+**Try asking:**
+• "What career suits me?"
+• "I like programming, what should I do?"
+• "Engineering colleges in Kerala"
+• "What to study after 12th?"
+
+How can I help you today? 😊"""
         
-        # Personalize with detected interests/skills
-        if self.context.get('detected_interests'):
-            response += f"\n\n💡 I noticed you mentioned interest in: {', '.join(self.context['detected_interests'])}. That's great!"
+        # CAREERS - with specific interest
+        elif intent == 'careers' or interests:
+            
+            # Technology/Programming
+            if 'technology' in interests or any(word in message_lower for word in ['programming', 'coding', 'software', 'tech', 'computer']):
+                return """Excellent! Technology is an amazing field! 💻
+
+**🌟 Top Technology Careers:**
+
+**1. Software Engineer** ⭐
+• Build applications and software systems
+• Starting Salary: ₹3-15 lakhs/year
+• Experienced: ₹15-50+ lakhs/year
+• Top Companies: Google, Microsoft, Amazon, Infosys
+
+**2. Web Developer** 🌐
+• Create websites and web applications
+• Salary: ₹2.5-10 lakhs/year
+• High freelance potential!
+
+**3. Data Scientist** 📊
+• Analyze data, build ML models
+• Starting: ₹5-20 lakhs/year
+• Experienced: ₹20-80+ lakhs/year
+
+**4. Mobile App Developer** 📱
+• Create iOS/Android apps
+• Salary: ₹3-12 lakhs/year
+
+**📚 Education Path:**
+After 12th → B.Tech Computer Science (4 years)
+**Entrance:** JEE Main, KEAM (Kerala)
+
+**🏛️ Top Colleges in Kerala:**
+• IIT Palakkad - JEE Advanced
+• NIT Calicut - JEE Main
+• Government Engineering Colleges - KEAM
+
+**💡 Next Steps:**
+1. Learn programming basics (Python recommended!)
+2. Build projects for portfolio
+3. Prepare for JEE/KEAM
+4. Join coding communities
+
+Want to know about colleges or entrance exams?"""
+            
+            # Medical
+            elif 'medical' in interests or any(word in message_lower for word in ['doctor', 'medical', 'mbbs', 'health']):
+                return """Wonderful! Medical field is noble and rewarding! ⚕️
+
+**🏥 Medical Career Options:**
+
+**1. MBBS (Doctor)** 👨‍⚕️
+• Duration: 5.5 years (+ 1 year internship)
+• Starting Salary: ₹6-20 lakhs/year
+• Specialist: ₹50 lakhs - 2 crore+/year
+• **Entrance:** NEET (competitive!)
+
+**2. BDS (Dentist)** 🦷
+• Duration: 5 years
+• Salary: ₹3-10 lakhs/year
+• Can open private practice
+
+**3. B.Sc Nursing** 👩‍⚕️
+• Duration: 4 years
+• Salary: ₹2-8 lakhs/year
+• Can work abroad (USA, UK, Middle East)
+
+**4. Pharmacy** 💊
+• Duration: 4 years (B.Pharm)
+• Salary: ₹3-8 lakhs/year
+• Can open pharmacy
+
+**📋 Requirements:**
+• 12th with Physics, Chemistry, Biology
+• NEET exam (600+ for govt colleges)
+
+**🏛️ Medical Colleges in Kerala:**
+**Government:**
+• Thiruvananthapuram Medical College
+• Kottayam Medical College
+• Kozhikode Medical College
+
+**Private:**
+• Amrita Medical College, Kochi
+
+**💰 Fees:**
+• Govt: ₹4-5 lakhs (total MBBS)
+• Private: ₹50 lakhs - 1 crore
+
+**📚 NEET Preparation:**
+• Start in Class 11
+• NCERT is crucial (80% from NCERT!)
+• Join coaching if possible
+• Target: 650+ for govt college
+
+Want NEET preparation tips or college details?"""
+            
+            # Engineering
+            elif 'engineering' in interests or 'engineer' in message_lower:
+                return """Great! Engineering offers diverse opportunities! ⚙️
+
+**🔧 Engineering Branches:**
+
+**1. Computer Science** 💻 Highest Demand
+• Software, AI, ML, App Development
+• Starting: ₹4-15 lakhs/year
+• Experienced: ₹20-50+ lakhs
+
+**2. Mechanical** ⚙️
+• Design, Manufacturing, Automobiles
+• Starting: ₹3-8 lakhs/year
+
+**3. Civil** 🏗️
+• Construction, Infrastructure
+• Starting: ₹3-7 lakhs/year
+
+**4. Electrical** ⚡
+• Power systems, Electronics
+• Starting: ₹3-8 lakhs/year
+
+**📚 Education:**
+• Duration: 4 years (B.Tech)
+• After 12th with PCM
+• **Entrance:** JEE Main, JEE Advanced, KEAM
+
+**🏛️ Top Colleges in Kerala:**
+• **IIT Palakkad** - JEE Advanced
+• **NIT Calicut** - JEE Main
+• **CET Trivandrum** - KEAM
+• **GEC Thrissur** - KEAM
+
+**💰 Fees:**
+• Govt: ₹30,000-50,000/year
+• Private: ₹80,000-2 lakhs/year
+
+Which branch interests you?"""
+            
+            # General career inquiry
+            else:
+                return """Let me help you find the perfect career! 🎯
+
+**🌟 Popular Career Fields:**
+
+**Technology 💻**
+• Software Engineer, Data Scientist
+• Salary: ₹4-50+ lakhs
+
+**Medical ⚕️**
+• Doctor, Dentist, Nurse
+• Salary: ₹6-80+ lakhs
+
+**Engineering ⚙️**
+• CS, Mechanical, Civil, Electrical
+• Salary: ₹3-40+ lakhs
+
+**Business 💼**
+• MBA, CA, Finance
+• Salary: ₹5-50+ lakhs
+
+**Creative 🎨**
+• Design, Architecture
+• Salary: ₹3-30+ lakhs
+
+**📋 To recommend better, tell me:**
+• What subjects do you enjoy?
+• What are you passionate about?
+• Current class (10th/12th)?
+
+Try saying:
+• "I like programming"
+• "I want to help people"
+• "I'm good at math"
+
+What interests you?"""
         
-        if self.context.get('detected_skills'):
-            response += f"\n\n⭐ I see you have skills in: {', '.join(self.context['detected_skills'])}. These are valuable!"
+        # EDUCATION - College inquiry
+        elif intent == 'education':
+            if 'engineering' in message_lower:
+                return """🏛️ **Engineering Colleges in Kerala**
+
+**🥇 Premier Institutions:**
+
+**IIT Palakkad**
+• Branches: CSE, EE, ME, Civil
+• Entrance: JEE Advanced
+• Average Package: ₹15-45 lakhs
+
+**NIT Calicut**
+• Branches: CSE, ECE, ME, Civil
+• Entrance: JEE Main
+• Average Package: ₹10-30 lakhs
+
+**🥈 Government Colleges:**
+
+**CET Trivandrum**
+• All major branches
+• Entrance: KEAM
+• Fees: ₹30,000/year
+
+**GEC Thrissur**
+• Strong placements
+• Fees: ₹35,000/year
+
+**TKM Kollam**
+• Good faculty
+• Fees: ₹40,000/year
+
+**📋 Admission:**
+• **IIT:** JEE Advanced
+• **NIT:** JEE Main (98+ percentile)
+• **Govt:** KEAM (Rank <5000)
+
+**💰 Fees:**
+• IIT/NIT: ₹1-2.5 lakhs/year
+• Govt: ₹30-50k/year
+• Private: ₹80k-2 lakhs/year
+
+Want admission process details?"""
+            
+            elif 'medical' in message_lower:
+                return """🏥 **Medical Colleges in Kerala**
+
+**Government Medical Colleges:**
+• Thiruvananthapuram Medical College
+• Kottayam Medical College
+• Kozhikode Medical College
+• Thrissur Medical College
+• Alappuzha Medical College
+
+**Private Medical Colleges:**
+• Amrita Institute, Kochi
+• Believers Church Medical College
+
+**📋 NEET & Admission:**
+• **Cutoff:** 600-650+ (Govt colleges)
+• **Private:** 450-550
+• **All India Quota:** 15% seats
+• **State Quota:** 85% seats
+
+**💰 Complete Cost:**
+• **Govt:** ₹4-5 lakhs (entire MBBS)
+• **Private:** ₹50 lakhs - 1 crore
+
+**⏰ Duration:**
+• 5.5 years (4.5 years + 1 year internship)
+
+Want NEET preparation guidance?"""
+            
+            else:
+                return """🎓 **College Information**
+
+I can help with:
+
+**Engineering Colleges** 🏗️
+• IIT, NIT, Government colleges
+→ Ask: "Engineering colleges in Kerala"
+
+**Medical Colleges** 🏥
+• MBBS, BDS colleges
+→ Ask: "Medical colleges in Kerala"
+
+**Arts & Science** 📚
+• BA, B.Sc, B.Com programs
+
+**Management** 💼
+• MBA, BBA colleges
+
+Which field are you interested in?"""
         
-        return response
+        # CONFUSED
+        elif intent == 'confused':
+            return """Don't worry! Feeling confused is totally normal! 🤗
+
+**Step-by-step approach:**
+
+**🔍 Step 1: Self-Assessment**
+• What subjects do you enjoy?
+• What activities make you happy?
+• What are your strengths?
+
+**📋 Step 2: Take Career Quiz**
+• 10-minute personality test
+• Get matched with careers
+• Free and personalized!
+→ Go to /quiz
+
+**💼 Step 3: Explore Options**
+• Browse different careers
+• Read about professions
+
+**👨‍💼 Step 4: Expert Guidance**
+• Book counsellor session
+• Get personalized advice
+→ Go to /counsellors
+
+**Right now:**
+Tell me your interests!
+
+Examples:
+• "I like programming"
+• "I enjoy science"
+• "I'm creative"
+
+What do you enjoy doing?"""
+        
+        # SALARY
+        elif intent == 'salary':
+            return """💰 **Salary Information by Career**
+
+**💻 Technology/IT:**
+• Software Engineer: ₹3-15 lakhs → ₹50+ lakhs
+• Data Scientist: ₹5-20 lakhs → ₹80+ lakhs
+
+**⚕️ Medical:**
+• Doctor (MBBS): ₹6-20 lakhs → ₹80+ lakhs
+• Specialist: ₹50 lakhs - 2 crore
+
+**⚙️ Engineering:**
+• Computer Science: ₹4-15 lakhs → ₹50+ lakhs
+• Mechanical: ₹3-8 lakhs → ₹30+ lakhs
+• Civil: ₹3-7 lakhs → ₹25+ lakhs
+
+**💼 Business:**
+• MBA (IIM): ₹15-50+ lakhs
+• CA: ₹6-15 lakhs → ₹80+ lakhs
+
+**📊 Factors Affecting Salary:**
+• Company (MNCs pay 30-50% more)
+• Location (metros pay higher)
+• Skills and certifications
+• Experience
+
+Which field's salary details do you want?"""
+        
+        # GOODBYE
+        elif intent == 'goodbye':
+            return """Goodbye! 👋
+
+Thank you for chatting! Remember:
+• I'm available 24/7
+• Come back anytime for guidance
+• Take the career quiz!
+
+Best wishes for your future! ✨"""
+        
+        # GENERAL/DEFAULT
+        else:
+            return """I'm your AI Career Counsellor! 🎯
+
+**What I can help with:**
+
+**Career Guidance** 💼
+• Discover matching careers
+• Salary information
+
+**College Info** 🏛️
+• Find colleges in Kerala
+• Admission details
+
+**Course Selection** 📚
+• After 10th/12th options
+• Entrance exams
+
+**Try asking:**
+• "What career suits me?"
+• "Engineering colleges in Kerala"
+• "I like programming"
+• "What after 12th science?"
+• "How much do engineers earn?"
+
+**Quick Actions:**
+📋 Take Career Quiz → /quiz
+💼 Browse Careers → /careers
+🏛️ Find Colleges → /colleges
+👨‍💼 Book Counsellor → /counsellors
+
+How can I help you? 😊"""
     
     def _get_quick_replies(self, intent: str) -> List[str]:
-        """Generate quick reply suggestions based on intent"""
+        """Generate quick reply suggestions"""
         
         suggestions = {
             'greeting': [
-                "Tell me about your interests",
-                "What are my skills?",
-                "Suggest careers for me",
-                "I want to take a quiz"
-            ],
-            'interests': [
-                "I like technology",
-                "I enjoy science",
-                "I'm creative and artistic",
-                "I want to help people"
-            ],
-            'skills': [
-                "I'm good at problem-solving",
-                "I'm a creative person",
-                "I have leadership skills",
-                "I'm analytical"
+                "What career suits me?",
+                "I like programming",
+                "Engineering colleges",
+                "Take career quiz"
             ],
             'careers': [
-                "Suggest careers for me",
-                "Tell me about engineering",
-                "What about medical field?",
-                "I need to take assessments"
+                "Technology careers",
+                "Medical field",
+                "Engineering options",
+                "Business careers"
             ],
             'education': [
-                "I'm in 12th grade",
-                "Show me engineering courses",
-                "Suggest good colleges",
-                "What stream should I choose?"
+                "Engineering colleges",
+                "Medical colleges",
+                "Admission process",
+                "Course options"
             ],
-            'quiz': [
-                "Start aptitude test",
-                "Take personality test",
-                "Tell me about assessments",
-                "Skip to recommendations"
-            ],
-            'help': [
-                "How does this work?",
-                "What should I do first?",
+            'confused': [
                 "Tell me about careers",
-                "Book a counsellor"
+                "I like technology",
+                "Take career quiz",
+                "Book counsellor"
             ]
         }
         
         return suggestions.get(intent, [
-            "Tell me about your interests",
-            "What careers suit me?",
-            "I need help",
-            "Book a counsellor"
+            "What career suits me?",
+            "Find colleges",
+            "Take quiz",
+            "I need help"
         ])
-    
-    def get_conversation_summary(self) -> Dict:
-        """Get summary of conversation for analysis"""
-        all_interests = []
-        all_skills = []
-        
-        for entry in self.conversation_history:
-            all_interests.extend(entry.get('interests', []))
-            all_skills.extend(entry.get('skills', []))
-        
-        return {
-            'total_messages': len(self.conversation_history),
-            'detected_interests': list(set(all_interests)),
-            'detected_skills': list(set(all_skills)),
-            'conversation_history': self.conversation_history
-        }
 
 
 # Singleton instance
