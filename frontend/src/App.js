@@ -25,7 +25,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import CounsellorDetails from './pages/CounsellorDetails';
 
 // Protected Route Component
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -40,6 +40,17 @@ const ProtectedRoute = ({ children }) => {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Check if user role is allowed
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    // Redirect to appropriate dashboard
+    if (user.role === 'admin') {
+      return <Navigate to="/admin-dashboard" replace />;
+    } else if (user.role === 'counsellor') {
+      return <Navigate to="/counsellor-dashboard" replace />;
+    }
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;
@@ -60,6 +71,12 @@ const PublicRoute = ({ children }) => {
   }
 
   if (user) {
+    // Redirect based on user role
+    if (user.role === 'admin') {
+      return <Navigate to="/admin-dashboard" replace />;
+    } else if (user.role === 'counsellor') {
+      return <Navigate to="/counsellor-dashboard" replace />;
+    }
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -81,6 +98,12 @@ const HomeRoute = () => {
   }
 
   if (user) {
+    // Redirect based on user role
+    if (user.role === 'admin') {
+      return <Navigate to="/admin-dashboard" replace />;
+    } else if (user.role === 'counsellor') {
+      return <Navigate to="/counsellor-dashboard" replace />;
+    }
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -173,11 +196,11 @@ function AppContent() {
             } 
           />
 
-          {/* Protected Routes */}
+          {/* Student Protected Routes */}
           <Route
             path="/dashboard"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['student']}>
                 <Dashboard />
               </ProtectedRoute>
             }
@@ -195,7 +218,7 @@ function AppContent() {
           <Route
             path="/chat"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['student']}>
                 <Chatbot />
               </ProtectedRoute>
             }
@@ -204,7 +227,7 @@ function AppContent() {
           <Route 
             path="/quiz" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['student']}>
                 <Quiz />
               </ProtectedRoute>
             } 
@@ -213,7 +236,7 @@ function AppContent() {
           <Route 
             path="/recommendations" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['student']}>
                 <Recommendations />
               </ProtectedRoute>
             } 
@@ -235,6 +258,7 @@ function AppContent() {
           <Route path="/colleges" element={<CollegeFinder />} />
           <Route path="/counsellors" element={<CounsellorDirectory />} />
           <Route path="/counsellors/:id" element={<CounsellorDetails />} />
+          
           {/* 404 Route - Must be last */}
           <Route path="*" element={<NotFound />} />
         </Routes>

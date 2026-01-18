@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import './CareerDetails.css';
+import '../assets/css/College.css';
 
 const CareerDetails = () => {
   const { id } = useParams();

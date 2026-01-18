@@ -1180,72 +1180,162 @@ def internal_error(error):
 
 # ==================== BLUEPRINT REGISTRATION ====================
 
+# ==================== SAFE BLUEPRINT REGISTRATION ====================
+
 if __name__ == '__main__':
     # Set DB in app config for blueprints
     app.config['DB'] = db
     
-    # Register Quiz API
+    blueprints_registered = []
+    blueprints_failed = []
+    
+    # 1. Register Quiz API
     try:
         from quiz_api import quiz_bp
         app.register_blueprint(quiz_bp, url_prefix='/api')
-        print("✅ Quiz API registered")
+        blueprints_registered.append('Quiz API')
+        print("✅ Quiz API registered at /api/quiz")
     except ImportError as e:
-        print(f"⚠️ quiz_api.py not found - skipping ({e})")
+        blueprints_failed.append(('quiz_api.py', str(e)))
+        print(f"⚠️  quiz_api.py not found - skipping")
+    except Exception as e:
+        blueprints_failed.append(('quiz_api.py', str(e)))
+        print(f"❌ Quiz API error: {e}")
     
-    # Register Appointment API
+    # 2. Register Appointment API
     try:
-        from appointment_routes import appointment_bp
+        from routes.appointment_routes import appointment_bp
         app.register_blueprint(appointment_bp, url_prefix='/api')
-        print("✅ Appointment API registered")
+        blueprints_registered.append('Appointment API')
+        print("✅ Appointment API registered at /api/appointments")
     except ImportError as e:
-        print(f"⚠️ appointment_routes.py not found - skipping ({e})")
+        blueprints_failed.append(('appointment_routes.py', str(e)))
+        print(f"⚠️  appointment_routes.py not found - skipping")
+    except Exception as e:
+        blueprints_failed.append(('appointment_routes.py', str(e)))
+        print(f"❌ Appointment API error: {e}")
     
-    # Register Payment API
+    # 3. Register Payment API
     try:
-        from payment_routes import payment_bp
+        from routes.payment_routes import payment_bp
         app.register_blueprint(payment_bp, url_prefix='/api/payment')
-        print("✅ Payment API registered")
+        blueprints_registered.append('Payment API')
+        print("✅ Payment API registered at /api/payment")
     except ImportError as e:
-        print(f"⚠️ payment_routes.py not found - skipping ({e})")
+        blueprints_failed.append(('payment_routes.py', str(e)))
+        print(f"⚠️  payment_routes.py not found - skipping")
+    except Exception as e:
+        blueprints_failed.append(('payment_routes.py', str(e)))
+        print(f"❌ Payment API error: {e}")
     
-    # Register Chat Routes - FIXED
+    # 4. Register Chat Routes (try both locations)
+    chat_registered = False
     try:
         from routes.chat_routes import chat_bp
         app.register_blueprint(chat_bp, url_prefix='/api')
-        print("✅ Chat API registered at /api/chat")
+        blueprints_registered.append('Chat API')
+        print("✅ Chat API registered at /api/chat (from routes/)")
+        chat_registered = True
     except ImportError:
         try:
             from chat_routes import chat_bp
             app.register_blueprint(chat_bp, url_prefix='/api')
+            blueprints_registered.append('Chat API')
             print("✅ Chat API registered at /api/chat")
+            chat_registered = True
         except ImportError as e:
-            print(f"⚠️ chat_routes.py not found - skipping ({e})")
+            blueprints_failed.append(('chat_routes.py', str(e)))
+            print(f"⚠️  chat_routes.py not found - skipping")
+        except Exception as e:
+            blueprints_failed.append(('chat_routes.py', str(e)))
+            print(f"❌ Chat API error: {e}")
+    except Exception as e:
+        blueprints_failed.append(('routes/chat_routes.py', str(e)))
+        print(f"❌ Chat API error: {e}")
     
-    # Register Admin API
+    # 5. Register Admin API
     try:
         from admin_api import admin_bp
         app.register_blueprint(admin_bp, url_prefix='/api/admin')
-        print("✅ Admin API registered")
+        blueprints_registered.append('Admin API')
+        print("✅ Admin API registered at /api/admin")
     except ImportError as e:
-        print(f"⚠️ admin_api.py not found - skipping ({e})")
+        blueprints_failed.append(('admin_api.py', str(e)))
+        print(f"⚠️  admin_api.py not found - skipping")
+    except Exception as e:
+        blueprints_failed.append(('admin_api.py', str(e)))
+        print(f"❌ Admin API error: {e}")
     
+    # Configuration
     port = int(os.getenv('PORT', 5000))
     debug = os.getenv('FLASK_ENV', 'development') == 'development'
     
+    # Print startup summary
     print("\n" + "=" * 60)
-    print("🚀 AI CAREER COUNSELLING BACKEND v7.0")
+    print("🚀 AI CAREER COUNSELLING BACKEND v7.1")
     print("=" * 60)
-    print("✅ All Features Integrated")
-    print("✅ Chat Routes Fixed - No Duplicates")
-    print("✅ MongoDB Connection Working")
+    
+    # Database status
     if db is not None:
-        print(f"\n✅ Database: {db.name}")
-        print(f"✅ Users: {db.users.count_documents({})}")
-        print(f"✅ Careers: {db.careers.count_documents({})}")
-        print(f"✅ Colleges: {db.colleges.count_documents({})}")
+        print(f"✅ Database: {db.name}")
+        try:
+            print(f"   Users: {db.users.count_documents({})}")
+            print(f"   Careers: {db.careers.count_documents({})}")
+            print(f"   Colleges: {db.colleges.count_documents({})}")
+        except Exception as e:
+            print(f"   ⚠️  Error counting documents: {e}")
+    else:
+        print("❌ Database: Not connected")
+    
+    # Blueprints status
+    print(f"\n📦 Blueprints Registered: {len(blueprints_registered)}")
+    for bp in blueprints_registered:
+        print(f"   ✅ {bp}")
+    
+    if blueprints_failed:
+        print(f"\n⚠️  Blueprints Failed: {len(blueprints_failed)}")
+        for filename, error in blueprints_failed:
+            print(f"   ❌ {filename}")
+    
+    # Endpoints
     print(f"\n🌐 Server: http://localhost:{port}")
     print(f"🏥 Health: http://localhost:{port}/api/health")
-    print(f"💬 Chat: http://localhost:{port}/api/chat/send")
+    
+    # List available endpoints
+    print("\n📍 Available Endpoints:")
+    print("   Authentication:")
+    print("     POST /api/auth/register")
+    print("     POST /api/auth/login")
+    print("     POST /api/auth/forgot-password")
+    print("     POST /api/auth/reset-password")
+    
+    print("   Data:")
+    print("     GET  /api/careers")
+    print("     GET  /api/colleges")
+    print("     GET  /api/counsellors")
+    
+    if 'Quiz API' in blueprints_registered:
+        print("   Quiz:")
+        print("     GET  /api/quiz/start")
+        print("     POST /api/quiz/submit")
+    
+    if 'Appointment API' in blueprints_registered:
+        print("   Appointments:")
+        print("     GET  /api/counsellors")
+        print("     POST /api/appointments")
+        print("     GET  /api/appointments")
+    
+    if 'Payment API' in blueprints_registered:
+        print("   Payment:")
+        print("     POST /api/payment/create-order")
+        print("     POST /api/payment/verify-payment")
+    
+    if 'Chat API' in blueprints_registered:
+        print("   Chat:")
+        print("     POST /api/chat/send")
+        print("     GET  /api/chat/history")
+    
     print("=" * 60 + "\n")
     
+    # Start server
     app.run(host='0.0.0.0', port=port, debug=debug)
