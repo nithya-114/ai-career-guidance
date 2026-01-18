@@ -1,247 +1,272 @@
+// src/components/Chatbot/Chatbot.js
 import React, { useState, useEffect, useRef } from 'react';
-import { Container, Row, Col, Form, Button, Card, Badge } from 'react-bootstrap';
-import { FaPaperPlane, FaRobot, FaUser, FaTrash } from 'react-icons/fa';
-import { chatAPI } from '../../services/api';
-import { useAuth } from '../../context/AuthContext';
+import axios from 'axios';
 import './Chatbot.css';
+
+const API_URL = 'http://localhost:5000/api';
 
 const Chatbot = () => {
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [sessionId] = useState(Date.now().toString());
-  const { user } = useAuth();
+  const [inputMessage, setInputMessage] = useState('');
+  const [sessionId, setSessionId] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [recommendations, setRecommendations] = useState([]);
+  const [showRecommendations, setShowRecommendations] = useState(false);
   const messagesEndRef = useRef(null);
-  const [showQuickReplies, setShowQuickReplies] = useState(true);
-
-  const quickReplies = [
-    { id: 1, text: "What are my interests?", category: "interests" },
-    { id: 2, text: "Tell me about my skills", category: "skills" },
-    { id: 3, text: "What careers suit me?", category: "careers" },
-    { id: 4, text: "I need help choosing", category: "help" },
-  ];
-
-  useEffect(() => {
-    // Initial greeting
-    const greeting = {
-      type: 'bot',
-      text: `Hello ${user?.name}! 👋 I'm your AI career counselor. I'm here to help you discover the perfect career path based on your interests, skills, and personality.\n\nLet's start by getting to know you better. What are you passionate about?`,
-      timestamp: new Date(),
-    };
-    setMessages([greeting]);
-  }, [user]);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleSend = async (messageText = input) => {
-    if (!messageText.trim()) return;
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
-    const userMessage = {
-      type: 'user',
-      text: messageText,
-      timestamp: new Date(),
+  useEffect(() => {
+    startChat();
+    // Cleanup function
+    return () => {
+      if (sessionId) {
+        endChat();
+      }
     };
+  }, []);
 
-    setMessages((prev) => [...prev, userMessage]);
-    setInput('');
-    setLoading(true);
-    setShowQuickReplies(false);
-
+  const startChat = async () => {
     try {
-      const response = await chatAPI.sendMessage({
-        message: messageText,
-        user_id: user?.id,
-        session_id: sessionId,
+      setIsLoading(true);
+      const response = await axios.post(`${API_URL}/chat/start`, {
+        session_id: null
       });
 
-      const botMessage = {
-        type: 'bot',
-        text: response.data.response,
-        timestamp: new Date(),
-        intent: response.data.intent,
-      };
-
-      setMessages((prev) => [...prev, botMessage]);
-      
-      // Show quick replies after bot response
-      setTimeout(() => setShowQuickReplies(true), 500);
+      if (response.data.success) {
+        setSessionId(response.data.session_id);
+        setMessages([{
+          role: 'bot',
+          content: response.data.message,
+          timestamp: new Date().toISOString()
+        }]);
+      }
     } catch (error) {
-      console.error('Chat error:', error);
-      const errorMessage = {
-        type: 'bot',
-        text: 'Sorry, I encountered an error. Please try again or rephrase your question.',
-        timestamp: new Date(),
-        isError: true,
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      console.error('Error starting chat:', error);
+      setMessages([{
+        role: 'bot',
+        content: 'Sorry, I encountered an error connecting to the server. Please make sure the backend is running on http://localhost:5000',
+        timestamp: new Date().toISOString()
+      }]);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const handleQuickReply = (replyText) => {
-    handleSend(replyText);
+  const endChat = async () => {
+    try {
+      await axios.post(`${API_URL}/chat/end/${sessionId}`);
+    } catch (error) {
+      console.error('Error ending chat:', error);
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!inputMessage.trim() || !sessionId || isLoading) return;
+
+    const userMessage = {
+      role: 'user',
+      content: inputMessage,
+      timestamp: new Date().toISOString()
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInputMessage('');
+    setIsLoading(true);
+
+    try {
+      const response = await axios.post(`${API_URL}/chat/message`, {
+        session_id: sessionId,
+        message: inputMessage
+      });
+
+      if (response.data.success) {
+        const botMessage = {
+          role: 'bot',
+          content: response.data.message,
+          timestamp: new Date().toISOString()
+        };
+
+        setMessages(prev => [...prev, botMessage]);
+
+        if (response.data.progress) {
+          setProgress(response.data.progress);
+        }
+
+        if (response.data.recommendations && response.data.recommendations.length > 0) {
+          setRecommendations(response.data.recommendations);
+          setShowRecommendations(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      const errorMessage = {
+        role: 'bot',
+        content: 'Sorry, I encountered an error. Please try again or check your connection.',
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      sendMessage();
     }
   };
 
-  const clearChat = () => {
-    const greeting = messages[0];
-    setMessages([greeting]);
-    setShowQuickReplies(true);
+  const resetChat = async () => {
+    if (sessionId) {
+      await endChat();
+    }
+    setMessages([]);
+    setRecommendations([]);
+    setShowRecommendations(false);
+    setProgress(0);
+    setSessionId(null);
+    startChat();
+  };
+
+  const formatMessage = (content) => {
+    // Convert markdown-style formatting
+    let formatted = content
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n/g, '<br/>');
+    return { __html: formatted };
+  };
+
+  const viewCareerDetails = async (careerId) => {
+    try {
+      const response = await axios.get(`${API_URL}/chat/career-details/${careerId}`);
+      if (response.data.success) {
+        alert(`Career: ${response.data.career.title}\n\nDescription: ${response.data.career.description}\n\nSkills: ${response.data.career.skills.join(', ')}`);
+      }
+    } catch (error) {
+      console.error('Error fetching career details:', error);
+    }
   };
 
   return (
-    <div className="chatbot-page">
-      <Container fluid className="h-100">
-        <Row className="justify-content-center h-100">
-          <Col lg={8} xl={6} className="d-flex flex-column h-100 py-4">
-            <Card className="chat-card flex-grow-1 d-flex flex-column shadow-lg border-0">
-              {/* Chat Header */}
-              <Card.Header className="bg-gradient-primary text-white d-flex justify-content-between align-items-center">
-                <div className="d-flex align-items-center">
-                  <div className="bot-avatar me-2">
-                    <FaRobot size={24} />
+    <div className="chatbot-container">
+      <div className="chatbot-header">
+        <div className="header-content">
+          <h2>🤖 AI Career Counsellor</h2>
+          <p>Let's discover your perfect career path!</p>
+        </div>
+        <button className="reset-btn" onClick={resetChat} title="Start New Session">
+          🔄 Reset
+        </button>
+      </div>
+
+      {progress > 0 && progress < 100 && (
+        <div className="progress-bar-container">
+          <div className="progress-bar" style={{ width: `${progress}%` }}>
+            <span className="progress-text">{progress}%</span>
+          </div>
+        </div>
+      )}
+
+      <div className="chatbot-messages">
+        {messages.map((msg, index) => (
+          <div key={index} className={`message ${msg.role}`}>
+            <div className="message-avatar">
+              {msg.role === 'bot' ? '🤖' : '👤'}
+            </div>
+            <div className="message-content">
+              <div 
+                className="message-text"
+                dangerouslySetInnerHTML={formatMessage(msg.content)}
+              />
+              <span className="message-time">
+                {new Date(msg.timestamp).toLocaleTimeString()}
+              </span>
+            </div>
+          </div>
+        ))}
+
+        {isLoading && (
+          <div className="message bot">
+            <div className="message-avatar">🤖</div>
+            <div className="message-content">
+              <div className="typing-indicator">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div ref={messagesEndRef} />
+      </div>
+
+      {showRecommendations && recommendations.length > 0 && (
+        <div className="recommendations-panel">
+          <h3>🎯 Your Career Recommendations</h3>
+          <div className="recommendations-grid">
+            {recommendations.map((rec, index) => (
+              <div key={index} className="recommendation-card">
+                <div className="rec-header">
+                  <h4>{rec.title}</h4>
+                  <span className="match-badge">
+                    {Math.round((rec.match_score / 20) * 100)}% Match
+                  </span>
+                </div>
+                <p className="rec-description">{rec.description}</p>
+                <div className="rec-details">
+                  <div className="rec-detail">
+                    <span className="detail-icon">💰</span>
+                    <span>{rec.salary_range}</span>
                   </div>
-                  <div>
-                    <h5 className="mb-0">AI Career Counselor</h5>
-                    <small className="opacity-75">
-                      <span className="status-dot"></span>
-                      Online
-                    </small>
+                  <div className="rec-detail">
+                    <span className="detail-icon">📈</span>
+                    <span>{rec.growth_potential}</span>
                   </div>
                 </div>
-                <Button 
-                  variant="outline-light" 
-                  size="sm"
-                  onClick={clearChat}
-                  title="Clear chat"
+                <div className="rec-courses">
+                  <strong>📚 Courses:</strong>
+                  <p>{rec.courses.slice(0, 2).join(', ')}</p>
+                </div>
+                <button 
+                  className="view-details-btn"
+                  onClick={() => viewCareerDetails(rec.career_id)}
                 >
-                  <FaTrash />
-                </Button>
-              </Card.Header>
+                  View Details
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-              {/* Chat Body */}
-              <Card.Body className="chat-body flex-grow-1 overflow-auto p-4">
-                {messages.map((msg, index) => (
-                  <div
-                    key={index}
-                    className={`message-wrapper ${msg.type === 'user' ? 'user-wrapper' : 'bot-wrapper'}`}
-                  >
-                    <div className="message-container">
-                      {msg.type === 'bot' && (
-                        <div className="message-avatar bot-avatar">
-                          <FaRobot />
-                        </div>
-                      )}
-                      
-                      <div className={`message-bubble ${msg.type}-message ${msg.isError ? 'error-message' : ''}`}>
-                        <p className="message-text">{msg.text}</p>
-                        <div className="message-meta">
-                          <small className="message-time">
-                            {msg.timestamp.toLocaleTimeString([], { 
-                              hour: '2-digit', 
-                              minute: '2-digit' 
-                            })}
-                          </small>
-                          {msg.intent && (
-                            <Badge bg="light" text="dark" className="ms-2 intent-badge">
-                              {msg.intent}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-
-                      {msg.type === 'user' && (
-                        <div className="message-avatar user-avatar">
-                          <FaUser />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-
-                {/* Typing Indicator */}
-                {loading && (
-                  <div className="message-wrapper bot-wrapper">
-                    <div className="message-container">
-                      <div className="message-avatar bot-avatar">
-                        <FaRobot />
-                      </div>
-                      <div className="typing-indicator">
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div ref={messagesEndRef} />
-              </Card.Body>
-
-              {/* Quick Replies */}
-              {showQuickReplies && messages.length > 1 && !loading && (
-                <div className="quick-replies-container px-4 py-2">
-                  <small className="text-muted d-block mb-2">Quick replies:</small>
-                  <div className="d-flex flex-wrap gap-2">
-                    {quickReplies.map((reply) => (
-                      <Button
-                        key={reply.id}
-                        variant="outline-primary"
-                        size="sm"
-                        className="quick-reply-btn"
-                        onClick={() => handleQuickReply(reply.text)}
-                      >
-                        {reply.text}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Chat Footer */}
-              <Card.Footer className="bg-white border-top p-3">
-                <Form onSubmit={(e) => { e.preventDefault(); handleSend(); }}>
-                  <div className="input-group">
-                    <Form.Control
-                      type="text"
-                      placeholder="Type your message..."
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      disabled={loading}
-                      className="chat-input"
-                    />
-                    <Button
-                      variant="primary"
-                      type="submit"
-                      disabled={loading || !input.trim()}
-                      className="send-btn"
-                    >
-                      <FaPaperPlane />
-                    </Button>
-                  </div>
-                </Form>
-                <small className="text-muted d-block mt-2 text-center">
-                  Press Enter to send, Shift+Enter for new line
-                </small>
-              </Card.Footer>
-            </Card>
-          </Col>
-        </Row>
-      </Container>
+      <div className="chatbot-input">
+        <textarea
+          value={inputMessage}
+          onChange={(e) => setInputMessage(e.target.value)}
+          onKeyPress={handleKeyPress}
+          placeholder="Type your message here..."
+          disabled={isLoading}
+          rows="1"
+        />
+        <button 
+          onClick={sendMessage} 
+          disabled={isLoading || !inputMessage.trim()}
+          className="send-btn"
+          title="Send message"
+        >
+          {isLoading ? '⏳' : '📤'}
+        </button>
+      </div>
     </div>
   );
 };

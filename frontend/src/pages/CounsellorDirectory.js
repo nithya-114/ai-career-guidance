@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import PaymentButton from '../components/PaymentButton';
+import { useNavigate } from 'react-router-dom';
 
 function CounsellorDirectory() {
+  const navigate = useNavigate(); // ADD THIS LINE - Initialize navigate
   const [counsellors, setCounsellors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -218,7 +220,10 @@ function CounsellorDirectory() {
 
                   {/* View Profile Link */}
                   <div className="text-center mt-2">
-                    <button className="btn btn-link btn-sm text-muted">
+                    <button 
+                      className="btn btn-link btn-sm text-muted"
+                      onClick={() => navigate(`/counsellors/${counsellor._id}`)}
+                    >
                       View Full Profile →
                     </button>
                   </div>

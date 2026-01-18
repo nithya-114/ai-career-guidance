@@ -20,6 +20,9 @@ import Quiz from './pages/Quiz';
 import Recommendations from './pages/Recommendations';
 import CollegeFinder from './pages/CollegeFinder';
 import CounsellorDirectory from './pages/CounsellorDirectory';
+import ForgotPassword from './components/ForgotPassword';
+import AdminDashboard from './pages/AdminDashboard';
+import CounsellorDetails from './pages/CounsellorDetails';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -154,6 +157,12 @@ function AppContent() {
             } 
           />
 
+          {/* Forgot Password Route */}
+          <Route 
+            path="/forgot-password"
+            element={<ForgotPassword />}
+          />
+
           {/* Admin Login Route */}
           <Route 
             path="/admin-login"
@@ -210,13 +219,23 @@ function AppContent() {
             } 
           />
 
+          {/* Admin Routes */}
+          <Route
+            path="/admin-dashboard"
+            element={
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
+            }
+          />
+
           {/* Public Career & College Routes */}
           <Route path="/careers" element={<CareerListing />} />
           <Route path="/careers/:id" element={<CareerDetails />} />
           <Route path="/colleges" element={<CollegeFinder />} />
           <Route path="/counsellors" element={<CounsellorDirectory />} />
-          
-          {/* 404 Route */}
+          <Route path="/counsellors/:id" element={<CounsellorDetails />} />
+          {/* 404 Route - Must be last */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>

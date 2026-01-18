@@ -1,6 +1,6 @@
 """
 AI Career Counselling Backend - Complete Production Version
-All Features Integrated - FIXED VERSION
+All Features Integrated - FIXED VERSION WITH CHAT ROUTES
 """
 
 from flask import Flask, request, jsonify
@@ -13,7 +13,9 @@ import jwt
 import os
 import re
 from dotenv import load_dotenv
-from quiz_api import quiz_bp
+from flask_mail import Mail, Message
+import secrets
+
 # Load environment variables
 load_dotenv()
 
@@ -23,6 +25,16 @@ app = Flask(__name__)
 # Configuration
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'career-counselling-secret-key-2026')
 app.config['MONGODB_URI'] = os.getenv('MONGODB_URI', 'mongodb://localhost:27017/career_counselling')
+
+# Email Configuration
+app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
+app.config['MAIL_USE_TLS'] = os.getenv('MAIL_USE_TLS', 'True') == 'True'
+app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', 'noreply@careerguide.com')
+
+mail = Mail(app)
 
 # Enable CORS
 CORS(app, resources={
@@ -223,10 +235,8 @@ def register():
             if not data.get('phone'):
                 return jsonify({'error': 'Phone number is required for counsellors'}), 400
             
-            # Get profile from request
             profile = data.get('profile', {})
             
-            # Validate profile fields
             if not profile.get('specialization'):
                 return jsonify({'error': 'Specialization is required for counsellors'}), 400
             if profile.get('experience') is None:
@@ -265,7 +275,6 @@ def register():
                 }
             })
         elif role == 'counsellor':
-            # Get profile from request
             profile = data.get('profile', {})
             
             user.update({
@@ -452,6 +461,232 @@ def verify_token():
         return jsonify({'error': error}), status
     
     return jsonify({'valid': True, 'user_id': user_id, 'role': role}), 200
+
+
+# ==================== FORGOT PASSWORD ROUTES ====================
+
+def send_reset_email(to_email, user_name, reset_code, reset_token):
+    """Send password reset email"""
+    try:
+        msg = Message(
+            subject='Password Reset Request - AI Career Guidance',
+            recipients=[to_email]
+        )
+        
+        msg.html = f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <h2 style="color: #4F46E5;">Password Reset Request</h2>
+                    
+                    <p>Hi {user_name},</p>
+                    
+                    <p>You requested to reset your password for your AI Career Guidance account.</p>
+                    
+                    <div style="background-color: #F3F4F6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                        <p style="margin: 0; font-size: 14px; color: #666;">Your reset code is:</p>
+                        <h1 style="margin: 10px 0; color: #4F46E5; letter-spacing: 5px;">{reset_code}</h1>
+                        <p style="margin: 0; font-size: 12px; color: #999;">This code will expire in 15 minutes</p>
+                    </div>
+                    
+                    <p>If you didn't request this, you can safely ignore this email.</p>
+                    
+                    <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 30px 0;">
+                    
+                    <p style="font-size: 12px; color: #999;">
+                        This is an automated email from AI Career Guidance System.
+                    </p>
+                </div>
+            </body>
+        </html>
+        """
+        
+        mail.send(msg)
+        return True
+        
+    except Exception as e:
+        print(f"❌ Email sending error: {e}")
+        raise e
+
+
+@app.route('/api/auth/forgot-password', methods=['POST', 'OPTIONS'])
+def forgot_password():
+    """Request password reset"""
+    if request.method == 'OPTIONS':
+        return '', 200
+    
+    if db is None:
+        return jsonify({'error': 'Database connection error'}), 500
+    
+    try:
+        data = request.json
+        print(f"\n🔑 Password reset request")
+        
+        if not data.get('email'):
+            return jsonify({'error': 'Email is required'}), 400
+        
+        email = data['email'].lower().strip()
+        
+        if not validate_email(email):
+            return jsonify({'error': 'Invalid email format'}), 400
+        
+        user = db.users.find_one({'email': email})
+        
+        if not user:
+            print(f"❌ Email not found: {email}")
+            return jsonify({
+                'message': 'If this email is registered, you will receive a password reset link shortly.'
+            }), 200
+        
+        print(f"✅ User found: {user['name']}")
+        
+        # Generate reset token and code
+        reset_token = secrets.token_urlsafe(32)
+        reset_code = ''.join([str(secrets.randbelow(10)) for _ in range(6)])
+        
+        expires_at = datetime.utcnow() + timedelta(minutes=15)
+        
+        db.users.update_one(
+            {'_id': user['_id']},
+            {
+                '$set': {
+                    'reset_token': reset_token,
+                    'reset_code': reset_code,
+                    'reset_expires': expires_at,
+                    'reset_requested_at': datetime.utcnow()
+                }
+            }
+        )
+        
+        print(f"✅ Reset code generated: {reset_code}")
+        
+        try:
+            send_reset_email(user['email'], user['name'], reset_code, reset_token)
+            print(f"✅ Reset email sent to: {email}")
+        except Exception as email_error:
+            print(f"⚠️ Email sending failed: {email_error}")
+        
+        return jsonify({
+            'message': 'If this email is registered, you will receive a password reset link shortly.',
+            'reset_code': reset_code if os.getenv('FLASK_ENV') == 'development' else None
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Forgot password error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to process request'}), 500
+
+
+@app.route('/api/auth/verify-reset-code', methods=['POST', 'OPTIONS'])
+def verify_reset_code():
+    """Verify reset code"""
+    if request.method == 'OPTIONS':
+        return '', 200
+    
+    if db is None:
+        return jsonify({'error': 'Database connection error'}), 500
+    
+    try:
+        data = request.json
+        
+        if not data.get('email') or not data.get('code'):
+            return jsonify({'error': 'Email and code are required'}), 400
+        
+        email = data['email'].lower().strip()
+        code = data['code'].strip()
+        
+        user = db.users.find_one({'email': email})
+        
+        if not user:
+            return jsonify({'error': 'Invalid email or code'}), 401
+        
+        if not user.get('reset_code'):
+            return jsonify({'error': 'No reset request found'}), 401
+        
+        if user.get('reset_expires') and user['reset_expires'] < datetime.utcnow():
+            return jsonify({'error': 'Reset code has expired. Please request a new one.'}), 401
+        
+        if user['reset_code'] != code:
+            return jsonify({'error': 'Invalid reset code'}), 401
+        
+        print(f"✅ Reset code verified for: {email}")
+        
+        return jsonify({
+            'message': 'Code verified successfully',
+            'reset_token': user.get('reset_token')
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Verify code error: {str(e)}")
+        return jsonify({'error': 'Verification failed'}), 500
+
+
+@app.route('/api/auth/reset-password', methods=['POST', 'OPTIONS'])
+def reset_password():
+    """Reset password using token"""
+    if request.method == 'OPTIONS':
+        return '', 200
+    
+    if db is None:
+        return jsonify({'error': 'Database connection error'}), 500
+    
+    try:
+        data = request.json
+        print(f"\n🔐 Password reset attempt")
+        
+        if not data.get('email') or not data.get('reset_token') or not data.get('new_password'):
+            return jsonify({'error': 'Email, reset token, and new password are required'}), 400
+        
+        email = data['email'].lower().strip()
+        reset_token = data['reset_token']
+        new_password = data['new_password']
+        
+        is_valid, errors = validate_password(new_password)
+        if not is_valid:
+            return jsonify({
+                'error': 'Password does not meet requirements',
+                'details': errors
+            }), 400
+        
+        user = db.users.find_one({'email': email})
+        
+        if not user:
+            return jsonify({'error': 'Invalid reset token'}), 401
+        
+        if not user.get('reset_token') or user['reset_token'] != reset_token:
+            return jsonify({'error': 'Invalid reset token'}), 401
+        
+        if user.get('reset_expires') and user['reset_expires'] < datetime.utcnow():
+            return jsonify({'error': 'Reset token has expired'}), 401
+        
+        hashed_password = hash_password(new_password)
+        
+        db.users.update_one(
+            {'_id': user['_id']},
+            {
+                '$set': {
+                    'password': hashed_password,
+                    'updated_at': datetime.utcnow()
+                },
+                '$unset': {
+                    'reset_token': '',
+                    'reset_code': '',
+                    'reset_expires': '',
+                    'reset_requested_at': ''
+                }
+            }
+        )
+        
+        print(f"✅ Password reset successful for: {email}")
+        
+        return jsonify({'message': 'Password reset successful. You can now login with your new password.'}), 200
+        
+    except Exception as e:
+        print(f"❌ Reset password error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Password reset failed'}), 500
 
 
 # ==================== USER PROFILE ROUTES ====================
@@ -756,74 +991,6 @@ def get_courses():
         return jsonify({'error': str(e)}), 500
 
 
-# ==================== CHAT ROUTES ====================
-
-def get_simple_chatbot_response(message):
-    """Simple keyword-based chatbot"""
-    msg = message.lower()
-    
-    # Greetings
-    if any(word in msg for word in ['hi', 'hello', 'hey']):
-        return {
-            'response': "Hello! 👋 I'm your AI Career Counsellor. I can help with careers, colleges, and courses!",
-            'intent': 'greeting',
-            'suggestions': ['Career options', 'Find colleges', 'Courses']
-        }
-    
-    # Career queries
-    elif 'software' in msg or 'coding' in msg or 'developer' in msg:
-        return {
-            'response': "🖥️ **Software Engineering** - Great choice!\n\n• Salary: ₹4-25 LPA\n• Skills: Programming, Problem-solving\n• Education: B.Tech CS, BCA, MCA\n• Top colleges: NIT Calicut, CET, CUSAT",
-            'intent': 'career',
-            'suggestions': ['Other tech careers', 'Find CS colleges']
-        }
-    
-    # Colleges
-    elif 'college' in msg:
-        return {
-            'response': "🏫 **Top Kerala Colleges:**\n\n• Engineering: NIT Calicut, CET\n• Medical: GMC Trivandrum\n• Management: IIM Kozhikode\n\nWhich type interests you?",
-            'intent': 'college',
-            'suggestions': ['Engineering', 'Medical', 'Management']
-        }
-    
-    # Default
-    else:
-        return {
-            'response': "I can help with:\n\n🎯 Career guidance\n🏫 College info\n📚 Course details\n\nWhat would you like to know?",
-            'intent': 'general',
-            'suggestions': ['Career options', 'Find colleges', 'Courses']
-        }
-
-
-@app.route('/api/chat', methods=['POST', 'OPTIONS'])
-def chat():
-    """AI Chatbot"""
-    if request.method == 'OPTIONS':
-        return '', 200
-    
-    try:
-        data = request.json
-        message = data.get('message', '').strip()
-        
-        if not message:
-            return jsonify({'error': 'Message required'}), 400
-        
-        # Get simple response
-        response = get_simple_chatbot_response(message)
-        
-        print(f"💬 Chat: '{message[:30]}...' → {response['intent']}")
-        
-        return jsonify(response), 200
-        
-    except Exception as e:
-        print(f"❌ Chat error: {e}")
-        return jsonify({
-            'response': 'How can I help you today?',
-            'intent': 'error',
-            'suggestions': ['Career advice', 'Find colleges']
-        }), 200
-
-
 # ==================== RECOMMENDATIONS ROUTES ====================
 
 @app.route('/api/recommendations', methods=['GET', 'OPTIONS'])
@@ -928,84 +1095,46 @@ def get_counsellor_details(counsellor_id):
         return jsonify({'error': str(e)}), 500
 
 
-# ==================== QUIZ ROUTES ====================
+# ==================== BASIC ROUTES ====================
 
-@app.route('/api/quiz/<quiz_type>/questions', methods=['GET', 'OPTIONS'])
-def get_quiz_questions(quiz_type):
-    """Get quiz questions"""
-    if request.method == 'OPTIONS':
-        return '', 200
-    
-    if quiz_type == 'aptitude':
-        questions = [
-            {
-                'id': 1,
-                'question': 'What is 2+2?',
-                'options': ['3', '4', '5', '6'],
-                'correct': '4'
-            }
-        ]
-    else:
-        questions = [
-            {
-                'id': 1,
-                'question': 'I prefer working:',
-                'options': ['Alone', 'In groups', 'With guidance', 'Independently']
-            }
-        ]
-    
-    return jsonify({'questions': questions}), 200
-
-
-@app.route('/api/quiz/submit', methods=['POST', 'OPTIONS'])
-def submit_quiz():
-    """Submit quiz answers"""
+@app.route('/api/health', methods=['GET', 'OPTIONS'])
+def health_check():
+    """Health check endpoint"""
     if request.method == 'OPTIONS':
         return '', 200
     
     try:
-        user_id, role, error, status = get_user_from_token()
-        if error:
-            return jsonify({'error': error}), status
+        db_status = 'connected' if db is not None else 'disconnected'
         
-        data = request.json
+        if db is not None:
+            user_count = db.users.count_documents({})
+            career_count = db.careers.count_documents({})
+            college_count = db.colleges.count_documents({})
+        else:
+            user_count = 0
+            career_count = 0
+            college_count = 0
         
-        result = {
-            'user_id': user_id,
-            'quiz_type': data.get('quiz_type'),
-            'score': 80,
-            'submitted_at': datetime.utcnow()
-        }
-        
-        return jsonify({'message': 'Quiz submitted successfully', 'result': result}), 200
-        
+        return jsonify({
+            'status': 'healthy',
+            'message': 'AI Career Counselling API',
+            'version': '7.0 - CHAT ROUTES FIXED',
+            'timestamp': datetime.utcnow().isoformat(),
+            'database': db_status,
+            'counts': {
+                'users': user_count,
+                'careers': career_count,
+                'colleges': college_count
+            }
+        }), 200
     except Exception as e:
-        print(f"❌ Submit quiz error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-
-# ==================== BASIC ROUTES ====================
-
-@app.route('/api/health', methods=['GET'])
-def health_check():
-    """Health check endpoint"""
-    db_status = 'connected' if db is not None else 'disconnected'
-    user_count = db.users.count_documents({}) if db else 0
-    career_count = db.careers.count_documents({}) if db else 0
-    college_count = db.colleges.count_documents({}) if db else 0
-    
-    return jsonify({
-        'status': 'healthy',
-        'message': 'AI Career Counselling API',
-        'version': '6.0 - FIXED',
-        'timestamp': datetime.utcnow().isoformat(),
-        'database': db_status,
-        'counts': {
-            'users': user_count,
-            'careers': career_count,
-            'colleges': college_count
-        }
-    }), 200
+        print(f"❌ Health check error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
 
 
 @app.route('/', methods=['GET'])
@@ -1013,7 +1142,7 @@ def root():
     """Root endpoint"""
     return jsonify({
         'message': 'AI Career Counselling Backend API',
-        'version': '6.0 - Complete Fixed Version',
+        'version': '7.0 - Chat Routes Fixed',
         'features': [
             'Authentication (username/email login, strong passwords)',
             'User profiles (students & counsellors)',
@@ -1033,7 +1162,7 @@ def root():
             'GET /api/colleges',
             'GET /api/counsellors',
             'GET /api/recommendations',
-            'POST /api/chat'
+            'POST /api/chat/send'
         ]
     }), 200
 
@@ -1043,21 +1172,72 @@ def root():
 def not_found(error):
     return jsonify({'error': 'Endpoint not found'}), 404
 
+
 @app.errorhandler(500)
 def internal_error(error):
     return jsonify({'error': 'Internal server error'}), 500
 
 
+# ==================== BLUEPRINT REGISTRATION ====================
+
 if __name__ == '__main__':
+    # Set DB in app config for blueprints
+    app.config['DB'] = db
+    
+    # Register Quiz API
+    try:
+        from quiz_api import quiz_bp
+        app.register_blueprint(quiz_bp, url_prefix='/api')
+        print("✅ Quiz API registered")
+    except ImportError as e:
+        print(f"⚠️ quiz_api.py not found - skipping ({e})")
+    
+    # Register Appointment API
+    try:
+        from appointment_routes import appointment_bp
+        app.register_blueprint(appointment_bp, url_prefix='/api')
+        print("✅ Appointment API registered")
+    except ImportError as e:
+        print(f"⚠️ appointment_routes.py not found - skipping ({e})")
+    
+    # Register Payment API
+    try:
+        from payment_routes import payment_bp
+        app.register_blueprint(payment_bp, url_prefix='/api/payment')
+        print("✅ Payment API registered")
+    except ImportError as e:
+        print(f"⚠️ payment_routes.py not found - skipping ({e})")
+    
+    # Register Chat Routes - FIXED
+    try:
+        from routes.chat_routes import chat_bp
+        app.register_blueprint(chat_bp, url_prefix='/api')
+        print("✅ Chat API registered at /api/chat")
+    except ImportError:
+        try:
+            from chat_routes import chat_bp
+            app.register_blueprint(chat_bp, url_prefix='/api')
+            print("✅ Chat API registered at /api/chat")
+        except ImportError as e:
+            print(f"⚠️ chat_routes.py not found - skipping ({e})")
+    
+    # Register Admin API
+    try:
+        from admin_api import admin_bp
+        app.register_blueprint(admin_bp, url_prefix='/api/admin')
+        print("✅ Admin API registered")
+    except ImportError as e:
+        print(f"⚠️ admin_api.py not found - skipping ({e})")
+    
     port = int(os.getenv('PORT', 5000))
     debug = os.getenv('FLASK_ENV', 'development') == 'development'
     
     print("\n" + "=" * 60)
-    print("🚀 AI CAREER COUNSELLING BACKEND v6.0 - FIXED")
+    print("🚀 AI CAREER COUNSELLING BACKEND v7.0")
     print("=" * 60)
     print("✅ All Features Integrated")
-    print("✅ Counsellor Registration FIXED")
-    print("✅ Profile validation working")
+    print("✅ Chat Routes Fixed - No Duplicates")
+    print("✅ MongoDB Connection Working")
     if db is not None:
         print(f"\n✅ Database: {db.name}")
         print(f"✅ Users: {db.users.count_documents({})}")
@@ -1065,6 +1245,7 @@ if __name__ == '__main__':
         print(f"✅ Colleges: {db.colleges.count_documents({})}")
     print(f"\n🌐 Server: http://localhost:{port}")
     print(f"🏥 Health: http://localhost:{port}/api/health")
+    print(f"💬 Chat: http://localhost:{port}/api/chat/send")
     print("=" * 60 + "\n")
-    app.register_blueprint(quiz_bp) 
+    
     app.run(host='0.0.0.0', port=port, debug=debug)

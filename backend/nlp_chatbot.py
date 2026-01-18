@@ -1,551 +1,466 @@
-"""
-Enhanced NLP Chatbot Module for Career Counselling
-Detailed, helpful responses for students
-"""
-
+# nlp_chatbot.py
+from flask import Blueprint, request, jsonify
+from flask_cors import cross_origin
+import spacy
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 import re
 from datetime import datetime
-from typing import Dict, List, Optional
-import random
+import numpy as np
+from collections import Counter
 
-class CareerChatbot:
-    """
-    Enhanced chatbot for career counselling with detailed responses
-    """
-    
-    def __init__(self):
-        self.context = {}
+# Create Blueprint
+chatbot_bp = Blueprint('chatbot', __name__)
+
+# Load spaCy model
+try:
+    nlp = spacy.load("en_core_web_sm")
+except:
+    print("Please install: python -m spacy download en_core_web_sm")
+    nlp = None
+
+# ==================== CAREER DATABASE ====================
+CAREER_DATABASE = {
+    "software_engineer": {
+        "title": "Software Engineer",
+        "keywords": ["coding", "programming", "software", "computer", "technology", "app", "website", "algorithm", "developer", "it", "python", "java"],
+        "skills": ["problem-solving", "logical", "analytical", "creative", "detail-oriented"],
+        "personality": ["introvert", "patient", "curious", "innovative", "focused"],
+        "courses": ["Computer Science", "Software Engineering", "Information Technology", "Computer Applications"],
+        "description": "Design, develop, and maintain software applications and systems",
+        "salary_range": "₹4-15 LPA",
+        "growth": "High"
+    },
+    "data_scientist": {
+        "title": "Data Scientist",
+        "keywords": ["data", "analysis", "statistics", "machine-learning", "ai", "research", "analytics", "python", "math", "algorithms"],
+        "skills": ["analytical", "mathematical", "problem-solving", "programming", "statistical"],
+        "personality": ["logical", "curious", "detail-oriented", "patient"],
+        "courses": ["Data Science", "Statistics", "Computer Science", "Mathematics", "AI/ML"],
+        "description": "Extract insights from complex data using advanced analytics",
+        "salary_range": "₹6-20 LPA",
+        "growth": "Very High"
+    },
+    "doctor": {
+        "title": "Medical Doctor",
+        "keywords": ["medicine", "health", "patient", "care", "biology", "science", "heal", "hospital", "medical", "surgery"],
+        "skills": ["empathy", "precision", "communication", "problem-solving", "analytical"],
+        "personality": ["caring", "patient", "hardworking", "compassionate", "responsible"],
+        "courses": ["MBBS", "Medicine", "Biology", "Pre-Medical Studies"],
+        "description": "Diagnose and treat illnesses, provide comprehensive medical care",
+        "salary_range": "₹6-25 LPA",
+        "growth": "High"
+    },
+    "teacher": {
+        "title": "Teacher/Educator",
+        "keywords": ["teaching", "education", "students", "learning", "explain", "knowledge", "school", "tutor", "training"],
+        "skills": ["communication", "patience", "creativity", "leadership", "empathy"],
+        "personality": ["extrovert", "patient", "caring", "organized", "enthusiastic"],
+        "courses": ["Education", "B.Ed", "Subject Specialization", "Teaching Certification"],
+        "description": "Educate and inspire students, facilitate learning and development",
+        "salary_range": "₹3-10 LPA",
+        "growth": "Moderate"
+    },
+    "business_analyst": {
+        "title": "Business Analyst",
+        "keywords": ["business", "analysis", "data", "strategy", "management", "finance", "market", "analytics", "consulting"],
+        "skills": ["analytical", "communication", "problem-solving", "critical-thinking", "strategic"],
+        "personality": ["logical", "detail-oriented", "strategic", "communicative"],
+        "courses": ["Business Administration", "Management", "Economics", "Data Analytics", "MBA"],
+        "description": "Analyze business processes and data to improve organizational efficiency",
+        "salary_range": "₹5-18 LPA",
+        "growth": "High"
+    },
+    "graphic_designer": {
+        "title": "Graphic Designer",
+        "keywords": ["design", "creative", "art", "visual", "graphics", "illustration", "photoshop", "drawing", "aesthetic"],
+        "skills": ["creativity", "visual-thinking", "attention-to-detail", "artistic", "innovative"],
+        "personality": ["creative", "artistic", "imaginative", "visual", "expressive"],
+        "courses": ["Graphic Design", "Visual Arts", "Fine Arts", "Digital Design", "Animation"],
+        "description": "Create visual content for digital and print media",
+        "salary_range": "₹3-12 LPA",
+        "growth": "Moderate"
+    },
+    "civil_engineer": {
+        "title": "Civil Engineer",
+        "keywords": ["construction", "buildings", "infrastructure", "engineering", "structure", "architecture", "design", "planning"],
+        "skills": ["problem-solving", "analytical", "precision", "planning", "technical"],
+        "personality": ["practical", "detail-oriented", "organized", "systematic"],
+        "courses": ["Civil Engineering", "Structural Engineering", "Construction Management"],
+        "description": "Design and oversee construction of infrastructure projects",
+        "salary_range": "₹4-15 LPA",
+        "growth": "Moderate"
+    },
+    "lawyer": {
+        "title": "Lawyer",
+        "keywords": ["law", "legal", "court", "justice", "advocate", "attorney", "rights", "litigation"],
+        "skills": ["communication", "analytical", "persuasion", "research", "argumentation"],
+        "personality": ["confident", "articulate", "logical", "argumentative", "ambitious"],
+        "courses": ["Law", "LLB", "Legal Studies", "Criminal Justice"],
+        "description": "Represent clients and provide legal advice on various matters",
+        "salary_range": "₹4-20 LPA",
+        "growth": "High"
+    },
+    "digital_marketer": {
+        "title": "Digital Marketing Specialist",
+        "keywords": ["marketing", "social-media", "advertising", "content", "seo", "digital", "branding", "campaigns"],
+        "skills": ["creativity", "communication", "analytical", "strategic", "persuasion"],
+        "personality": ["extrovert", "creative", "strategic", "adaptable"],
+        "courses": ["Marketing", "Digital Marketing", "Business", "Communications", "MBA"],
+        "description": "Develop and execute digital marketing strategies across platforms",
+        "salary_range": "₹3-15 LPA",
+        "growth": "Very High"
+    },
+    "mechanical_engineer": {
+        "title": "Mechanical Engineer",
+        "keywords": ["mechanical", "machines", "manufacturing", "engineering", "design", "automotive", "production"],
+        "skills": ["problem-solving", "analytical", "technical", "precision", "innovative"],
+        "personality": ["practical", "detail-oriented", "logical", "hands-on"],
+        "courses": ["Mechanical Engineering", "Automobile Engineering", "Manufacturing"],
+        "description": "Design, develop, and test mechanical devices and systems",
+        "salary_range": "₹4-14 LPA",
+        "growth": "Moderate"
+    },
+    "psychologist": {
+        "title": "Psychologist",
+        "keywords": ["psychology", "mental-health", "counseling", "therapy", "behavior", "mind", "emotions"],
+        "skills": ["empathy", "listening", "analytical", "communication", "patience"],
+        "personality": ["caring", "patient", "understanding", "intuitive", "compassionate"],
+        "courses": ["Psychology", "Clinical Psychology", "Counseling", "Mental Health"],
+        "description": "Study behavior and mental processes, provide therapeutic support",
+        "salary_range": "₹3-12 LPA",
+        "growth": "High"
+    },
+    "chartered_accountant": {
+        "title": "Chartered Accountant",
+        "keywords": ["accounting", "finance", "taxation", "audit", "numbers", "ca", "financial", "money"],
+        "skills": ["analytical", "attention-to-detail", "mathematical", "organized", "ethical"],
+        "personality": ["detail-oriented", "logical", "systematic", "responsible"],
+        "courses": ["Commerce", "Accounting", "CA", "Finance", "Taxation"],
+        "description": "Manage financial records, audits, and provide financial advice",
+        "salary_range": "₹6-25 LPA",
+        "growth": "High"
+    }
+}
+
+# ==================== SESSION STORAGE ====================
+chat_sessions = {}
+
+class ChatSession:
+    def __init__(self, session_id):
+        self.session_id = session_id
         self.conversation_history = []
-        
-        # Intent patterns
-        self.intent_patterns = {
-            'greeting': [
-                r'\b(hi|hello|hey|good\s+(morning|afternoon|evening)|greetings)\b',
-            ],
-            'goodbye': [
-                r'\b(bye|goodbye|see\s+you|talk\s+later|exit|quit)\b',
-            ],
-            'interests': [
-                r'\b(interest|like|enjoy|love|passionate|hobby)\b',
-            ],
-            'careers': [
-                r'\b(career|job|profession|suit\s+me|best\s+for\s+me)\b',
-            ],
-            'education': [
-                r'\b(college|university|course|degree|study)\b',
-            ],
-            'confused': [
-                r'\b(confused|don\'t\s+know|help|lost|not\s+sure)\b',
-            ],
-            'salary': [
-                r'\b(salary|earn|income|pay)\b',
-            ],
+        self.user_profile = {
+            "interests": [],
+            "skills": [],
+            "personality": [],
+            "subjects": [],
+            "hobbies": []
         }
+        self.current_stage = "greeting"
+        self.question_count = 0
+        self.max_questions = 8
+        self.career_scores = {}
         
-        # Interest keywords
-        self.interest_keywords = {
-            'technology': ['computer', 'programming', 'coding', 'software', 'tech', 'ai', 'app', 'website'],
-            'medical': ['medicine', 'doctor', 'health', 'hospital', 'patient', 'medical'],
-            'engineering': ['engineer', 'mechanical', 'civil', 'electrical', 'building'],
-            'business': ['business', 'management', 'marketing', 'entrepreneur'],
-        }
+    def add_message(self, role, content):
+        self.conversation_history.append({
+            "role": role,
+            "content": content,
+            "timestamp": datetime.now().isoformat()
+        })
+
+# ==================== NLP PROCESSING ====================
+def extract_keywords(text):
+    """Extract keywords using spaCy"""
+    if not nlp:
+        return text.lower().split()
     
-    def preprocess_text(self, text: str) -> str:
-        """Clean and normalize text"""
-        return text.lower().strip()
+    doc = nlp(text.lower())
+    keywords = []
     
-    def detect_intent(self, text: str) -> str:
-        """Detect user intent from text"""
-        text = self.preprocess_text(text)
-        
-        for intent, patterns in self.intent_patterns.items():
-            for pattern in patterns:
-                if re.search(pattern, text, re.IGNORECASE):
-                    return intent
-        
-        return 'general'
+    # Extract nouns, verbs, and adjectives
+    for token in doc:
+        if token.pos_ in ['NOUN', 'VERB', 'ADJ'] and not token.is_stop:
+            keywords.append(token.lemma_)
     
-    def extract_interests(self, text: str) -> List[str]:
-        """Extract interests from user message"""
-        text = self.preprocess_text(text)
-        interests = []
-        
-        for interest, keywords in self.interest_keywords.items():
-            for keyword in keywords:
-                if keyword in text:
-                    interests.append(interest)
-                    break
-        
-        return list(set(interests))
+    return keywords if keywords else text.lower().split()
+
+def analyze_sentiment(text):
+    """Basic sentiment analysis"""
+    positive_words = ['love', 'enjoy', 'like', 'passion', 'interested', 'excited', 'great', 'good', 'excellent']
+    negative_words = ['hate', 'dislike', 'boring', 'difficult', 'hard', 'not']
     
-    def generate_response(self, user_message: str, user_profile: Optional[Dict] = None) -> Dict:
-        """Generate intelligent response"""
-        
-        intent = self.detect_intent(user_message)
-        interests = self.extract_interests(user_message)
-        
-        response = self._generate_intent_response(intent, user_message, interests)
-        
-        return {
-            'response': response,
-            'intent': intent,
-            'suggestions': self._get_quick_replies(intent)
-        }
+    text_lower = text.lower()
+    pos_count = sum(1 for word in positive_words if word in text_lower)
+    neg_count = sum(1 for word in negative_words if word in text_lower)
     
-    def _generate_intent_response(self, intent: str, message: str, interests: List[str]) -> str:
-        """Generate detailed response based on intent"""
-        
-        message_lower = message.lower()
-        
-        # GREETING
-        if intent == 'greeting':
-            return """Hello! 👋 I'm your AI Career Counsellor!
-
-I can help you with:
-🎯 **Career Guidance** - Discover careers matching your interests
-🏛️ **College Information** - Best colleges in Kerala
-📚 **Course Selection** - What to study after 10th/12th
-💡 **Career Planning** - Personalized roadmaps
-
-**Try asking:**
-• "What career suits me?"
-• "I like programming, what should I do?"
-• "Engineering colleges in Kerala"
-• "What to study after 12th?"
-
-How can I help you today? 😊"""
-        
-        # CAREERS - with specific interest
-        elif intent == 'careers' or interests:
-            
-            # Technology/Programming
-            if 'technology' in interests or any(word in message_lower for word in ['programming', 'coding', 'software', 'tech', 'computer']):
-                return """Excellent! Technology is an amazing field! 💻
-
-**🌟 Top Technology Careers:**
-
-**1. Software Engineer** ⭐
-• Build applications and software systems
-• Starting Salary: ₹3-15 lakhs/year
-• Experienced: ₹15-50+ lakhs/year
-• Top Companies: Google, Microsoft, Amazon, Infosys
-
-**2. Web Developer** 🌐
-• Create websites and web applications
-• Salary: ₹2.5-10 lakhs/year
-• High freelance potential!
-
-**3. Data Scientist** 📊
-• Analyze data, build ML models
-• Starting: ₹5-20 lakhs/year
-• Experienced: ₹20-80+ lakhs/year
-
-**4. Mobile App Developer** 📱
-• Create iOS/Android apps
-• Salary: ₹3-12 lakhs/year
-
-**📚 Education Path:**
-After 12th → B.Tech Computer Science (4 years)
-**Entrance:** JEE Main, KEAM (Kerala)
-
-**🏛️ Top Colleges in Kerala:**
-• IIT Palakkad - JEE Advanced
-• NIT Calicut - JEE Main
-• Government Engineering Colleges - KEAM
-
-**💡 Next Steps:**
-1. Learn programming basics (Python recommended!)
-2. Build projects for portfolio
-3. Prepare for JEE/KEAM
-4. Join coding communities
-
-Want to know about colleges or entrance exams?"""
-            
-            # Medical
-            elif 'medical' in interests or any(word in message_lower for word in ['doctor', 'medical', 'mbbs', 'health']):
-                return """Wonderful! Medical field is noble and rewarding! ⚕️
-
-**🏥 Medical Career Options:**
-
-**1. MBBS (Doctor)** 👨‍⚕️
-• Duration: 5.5 years (+ 1 year internship)
-• Starting Salary: ₹6-20 lakhs/year
-• Specialist: ₹50 lakhs - 2 crore+/year
-• **Entrance:** NEET (competitive!)
-
-**2. BDS (Dentist)** 🦷
-• Duration: 5 years
-• Salary: ₹3-10 lakhs/year
-• Can open private practice
-
-**3. B.Sc Nursing** 👩‍⚕️
-• Duration: 4 years
-• Salary: ₹2-8 lakhs/year
-• Can work abroad (USA, UK, Middle East)
-
-**4. Pharmacy** 💊
-• Duration: 4 years (B.Pharm)
-• Salary: ₹3-8 lakhs/year
-• Can open pharmacy
-
-**📋 Requirements:**
-• 12th with Physics, Chemistry, Biology
-• NEET exam (600+ for govt colleges)
-
-**🏛️ Medical Colleges in Kerala:**
-**Government:**
-• Thiruvananthapuram Medical College
-• Kottayam Medical College
-• Kozhikode Medical College
-
-**Private:**
-• Amrita Medical College, Kochi
-
-**💰 Fees:**
-• Govt: ₹4-5 lakhs (total MBBS)
-• Private: ₹50 lakhs - 1 crore
-
-**📚 NEET Preparation:**
-• Start in Class 11
-• NCERT is crucial (80% from NCERT!)
-• Join coaching if possible
-• Target: 650+ for govt college
-
-Want NEET preparation tips or college details?"""
-            
-            # Engineering
-            elif 'engineering' in interests or 'engineer' in message_lower:
-                return """Great! Engineering offers diverse opportunities! ⚙️
-
-**🔧 Engineering Branches:**
-
-**1. Computer Science** 💻 Highest Demand
-• Software, AI, ML, App Development
-• Starting: ₹4-15 lakhs/year
-• Experienced: ₹20-50+ lakhs
-
-**2. Mechanical** ⚙️
-• Design, Manufacturing, Automobiles
-• Starting: ₹3-8 lakhs/year
-
-**3. Civil** 🏗️
-• Construction, Infrastructure
-• Starting: ₹3-7 lakhs/year
-
-**4. Electrical** ⚡
-• Power systems, Electronics
-• Starting: ₹3-8 lakhs/year
-
-**📚 Education:**
-• Duration: 4 years (B.Tech)
-• After 12th with PCM
-• **Entrance:** JEE Main, JEE Advanced, KEAM
-
-**🏛️ Top Colleges in Kerala:**
-• **IIT Palakkad** - JEE Advanced
-• **NIT Calicut** - JEE Main
-• **CET Trivandrum** - KEAM
-• **GEC Thrissur** - KEAM
-
-**💰 Fees:**
-• Govt: ₹30,000-50,000/year
-• Private: ₹80,000-2 lakhs/year
-
-Which branch interests you?"""
-            
-            # General career inquiry
-            else:
-                return """Let me help you find the perfect career! 🎯
-
-**🌟 Popular Career Fields:**
-
-**Technology 💻**
-• Software Engineer, Data Scientist
-• Salary: ₹4-50+ lakhs
-
-**Medical ⚕️**
-• Doctor, Dentist, Nurse
-• Salary: ₹6-80+ lakhs
-
-**Engineering ⚙️**
-• CS, Mechanical, Civil, Electrical
-• Salary: ₹3-40+ lakhs
-
-**Business 💼**
-• MBA, CA, Finance
-• Salary: ₹5-50+ lakhs
-
-**Creative 🎨**
-• Design, Architecture
-• Salary: ₹3-30+ lakhs
-
-**📋 To recommend better, tell me:**
-• What subjects do you enjoy?
-• What are you passionate about?
-• Current class (10th/12th)?
-
-Try saying:
-• "I like programming"
-• "I want to help people"
-• "I'm good at math"
-
-What interests you?"""
-        
-        # EDUCATION - College inquiry
-        elif intent == 'education':
-            if 'engineering' in message_lower:
-                return """🏛️ **Engineering Colleges in Kerala**
-
-**🥇 Premier Institutions:**
-
-**IIT Palakkad**
-• Branches: CSE, EE, ME, Civil
-• Entrance: JEE Advanced
-• Average Package: ₹15-45 lakhs
-
-**NIT Calicut**
-• Branches: CSE, ECE, ME, Civil
-• Entrance: JEE Main
-• Average Package: ₹10-30 lakhs
-
-**🥈 Government Colleges:**
-
-**CET Trivandrum**
-• All major branches
-• Entrance: KEAM
-• Fees: ₹30,000/year
-
-**GEC Thrissur**
-• Strong placements
-• Fees: ₹35,000/year
-
-**TKM Kollam**
-• Good faculty
-• Fees: ₹40,000/year
-
-**📋 Admission:**
-• **IIT:** JEE Advanced
-• **NIT:** JEE Main (98+ percentile)
-• **Govt:** KEAM (Rank <5000)
-
-**💰 Fees:**
-• IIT/NIT: ₹1-2.5 lakhs/year
-• Govt: ₹30-50k/year
-• Private: ₹80k-2 lakhs/year
-
-Want admission process details?"""
-            
-            elif 'medical' in message_lower:
-                return """🏥 **Medical Colleges in Kerala**
-
-**Government Medical Colleges:**
-• Thiruvananthapuram Medical College
-• Kottayam Medical College
-• Kozhikode Medical College
-• Thrissur Medical College
-• Alappuzha Medical College
-
-**Private Medical Colleges:**
-• Amrita Institute, Kochi
-• Believers Church Medical College
-
-**📋 NEET & Admission:**
-• **Cutoff:** 600-650+ (Govt colleges)
-• **Private:** 450-550
-• **All India Quota:** 15% seats
-• **State Quota:** 85% seats
-
-**💰 Complete Cost:**
-• **Govt:** ₹4-5 lakhs (entire MBBS)
-• **Private:** ₹50 lakhs - 1 crore
-
-**⏰ Duration:**
-• 5.5 years (4.5 years + 1 year internship)
-
-Want NEET preparation guidance?"""
-            
-            else:
-                return """🎓 **College Information**
-
-I can help with:
-
-**Engineering Colleges** 🏗️
-• IIT, NIT, Government colleges
-→ Ask: "Engineering colleges in Kerala"
-
-**Medical Colleges** 🏥
-• MBBS, BDS colleges
-→ Ask: "Medical colleges in Kerala"
-
-**Arts & Science** 📚
-• BA, B.Sc, B.Com programs
-
-**Management** 💼
-• MBA, BBA colleges
-
-Which field are you interested in?"""
-        
-        # CONFUSED
-        elif intent == 'confused':
-            return """Don't worry! Feeling confused is totally normal! 🤗
-
-**Step-by-step approach:**
-
-**🔍 Step 1: Self-Assessment**
-• What subjects do you enjoy?
-• What activities make you happy?
-• What are your strengths?
-
-**📋 Step 2: Take Career Quiz**
-• 10-minute personality test
-• Get matched with careers
-• Free and personalized!
-→ Go to /quiz
-
-**💼 Step 3: Explore Options**
-• Browse different careers
-• Read about professions
-
-**👨‍💼 Step 4: Expert Guidance**
-• Book counsellor session
-• Get personalized advice
-→ Go to /counsellors
-
-**Right now:**
-Tell me your interests!
-
-Examples:
-• "I like programming"
-• "I enjoy science"
-• "I'm creative"
-
-What do you enjoy doing?"""
-        
-        # SALARY
-        elif intent == 'salary':
-            return """💰 **Salary Information by Career**
-
-**💻 Technology/IT:**
-• Software Engineer: ₹3-15 lakhs → ₹50+ lakhs
-• Data Scientist: ₹5-20 lakhs → ₹80+ lakhs
-
-**⚕️ Medical:**
-• Doctor (MBBS): ₹6-20 lakhs → ₹80+ lakhs
-• Specialist: ₹50 lakhs - 2 crore
-
-**⚙️ Engineering:**
-• Computer Science: ₹4-15 lakhs → ₹50+ lakhs
-• Mechanical: ₹3-8 lakhs → ₹30+ lakhs
-• Civil: ₹3-7 lakhs → ₹25+ lakhs
-
-**💼 Business:**
-• MBA (IIM): ₹15-50+ lakhs
-• CA: ₹6-15 lakhs → ₹80+ lakhs
-
-**📊 Factors Affecting Salary:**
-• Company (MNCs pay 30-50% more)
-• Location (metros pay higher)
-• Skills and certifications
-• Experience
-
-Which field's salary details do you want?"""
-        
-        # GOODBYE
-        elif intent == 'goodbye':
-            return """Goodbye! 👋
-
-Thank you for chatting! Remember:
-• I'm available 24/7
-• Come back anytime for guidance
-• Take the career quiz!
-
-Best wishes for your future! ✨"""
-        
-        # GENERAL/DEFAULT
-        else:
-            return """I'm your AI Career Counsellor! 🎯
-
-**What I can help with:**
-
-**Career Guidance** 💼
-• Discover matching careers
-• Salary information
-
-**College Info** 🏛️
-• Find colleges in Kerala
-• Admission details
-
-**Course Selection** 📚
-• After 10th/12th options
-• Entrance exams
-
-**Try asking:**
-• "What career suits me?"
-• "Engineering colleges in Kerala"
-• "I like programming"
-• "What after 12th science?"
-• "How much do engineers earn?"
-
-**Quick Actions:**
-📋 Take Career Quiz → /quiz
-💼 Browse Careers → /careers
-🏛️ Find Colleges → /colleges
-👨‍💼 Book Counsellor → /counsellors
-
-How can I help you? 😊"""
+    if pos_count > neg_count:
+        return "positive"
+    elif neg_count > pos_count:
+        return "negative"
+    return "neutral"
+
+def calculate_career_match(user_profile):
+    """Calculate match score for each career"""
+    scores = {}
     
-    def _get_quick_replies(self, intent: str) -> List[str]:
-        """Generate quick reply suggestions"""
+    for career_id, career_data in CAREER_DATABASE.items():
+        score = 0
         
-        suggestions = {
-            'greeting': [
-                "What career suits me?",
-                "I like programming",
-                "Engineering colleges",
-                "Take career quiz"
-            ],
-            'careers': [
-                "Technology careers",
-                "Medical field",
-                "Engineering options",
-                "Business careers"
-            ],
-            'education': [
-                "Engineering colleges",
-                "Medical colleges",
-                "Admission process",
-                "Course options"
-            ],
-            'confused': [
-                "Tell me about careers",
-                "I like technology",
-                "Take career quiz",
-                "Book counsellor"
-            ]
-        }
+        # Match interests with keywords
+        for interest in user_profile['interests']:
+            if interest in career_data['keywords']:
+                score += 3
         
-        return suggestions.get(intent, [
-            "What career suits me?",
-            "Find colleges",
-            "Take quiz",
-            "I need help"
-        ])
+        # Match skills
+        for skill in user_profile['skills']:
+            if skill in career_data['skills']:
+                score += 2
+        
+        # Match personality
+        for trait in user_profile['personality']:
+            if trait in career_data['personality']:
+                score += 2
+        
+        # Match subjects/hobbies
+        for item in user_profile['subjects'] + user_profile['hobbies']:
+            if item in career_data['keywords']:
+                score += 1.5
+        
+        scores[career_id] = score
+    
+    # Sort by score
+    sorted_careers = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    return sorted_careers
 
+# ==================== CONVERSATION FLOW ====================
+def get_next_question(session):
+    """Generate next question based on conversation stage"""
+    stage = session.current_stage
+    count = session.question_count
+    
+    questions = {
+        "greeting": "Hello! I'm your AI Career Counsellor. I'm here to help you discover the perfect career path. What's your name?",
+        "interests": "That's a great name! Let's start exploring your interests. What subjects or activities do you enjoy the most?",
+        "skills": "Interesting! Now, what would you say are your strongest skills? (e.g., problem-solving, creativity, communication)",
+        "personality": "Great! How would you describe your personality? Are you more introverted or extroverted? Detail-oriented or big-picture thinker?",
+        "hobbies": "Tell me about your hobbies and what you like to do in your free time.",
+        "favorite_subjects": "Which academic subjects do you find most interesting or excel at?",
+        "work_preference": "Do you prefer working with people, working with technology/data, or working with creative/artistic tasks?",
+        "future_vision": "Where do you see yourself in 5-10 years? What kind of work environment appeals to you?",
+        "analyze": "Thank you for sharing! Let me analyze your responses and suggest the best career paths for you..."
+    }
+    
+    stages_order = ["greeting", "interests", "skills", "personality", "hobbies", 
+                   "favorite_subjects", "work_preference", "future_vision", "analyze"]
+    
+    if stage in stages_order:
+        current_index = stages_order.index(stage)
+        if current_index < len(stages_order) - 1:
+            next_stage = stages_order[current_index + 1]
+            session.current_stage = next_stage
+            return questions.get(next_stage, "Tell me more about yourself.")
+    
+    return questions.get(stage, "Tell me more about your interests and goals.")
 
-# Singleton instance
-chatbot_instance = CareerChatbot()
+def process_user_response(session, user_message):
+    """Process user response and update profile"""
+    keywords = extract_keywords(user_message)
+    sentiment = analyze_sentiment(user_message)
+    
+    stage = session.current_stage
+    
+    # Extract relevant information based on stage
+    if stage == "interests":
+        session.user_profile['interests'].extend(keywords)
+    elif stage == "skills":
+        session.user_profile['skills'].extend(keywords)
+    elif stage == "personality":
+        session.user_profile['personality'].extend(keywords)
+    elif stage == "hobbies":
+        session.user_profile['hobbies'].extend(keywords)
+    elif stage == "favorite_subjects":
+        session.user_profile['subjects'].extend(keywords)
+    elif stage in ["work_preference", "future_vision"]:
+        session.user_profile['interests'].extend(keywords)
+        session.user_profile['personality'].extend(keywords)
+    
+    session.question_count += 1
 
+def generate_recommendations(session):
+    """Generate career recommendations"""
+    career_matches = calculate_career_match(session.user_profile)
+    
+    # Get top 3 careers
+    top_careers = career_matches[:3]
+    
+    recommendations = []
+    for career_id, score in top_careers:
+        if score > 0:  # Only include careers with positive scores
+            career = CAREER_DATABASE[career_id]
+            recommendations.append({
+                "career_id": career_id,
+                "title": career['title'],
+                "description": career['description'],
+                "match_score": round(score, 2),
+                "courses": career['courses'],
+                "salary_range": career['salary_range'],
+                "growth_potential": career['growth']
+            })
+    
+    return recommendations
 
-def get_chatbot_response(message: str, user_profile: Optional[Dict] = None) -> Dict:
-    """
-    Main function to get chatbot response
-    """
+# ==================== API ENDPOINTS ====================
+@chatbot_bp.route('/chat/start', methods=['POST'])
+@cross_origin()
+def start_chat():
+    """Initialize a new chat session"""
     try:
-        return chatbot_instance.generate_response(message, user_profile)
+        data = request.json
+        session_id = data.get('session_id') or f"session_{datetime.now().timestamp()}"
+        
+        # Create new session
+        session = ChatSession(session_id)
+        chat_sessions[session_id] = session
+        
+        # Get greeting message
+        greeting = get_next_question(session)
+        session.add_message("bot", greeting)
+        
+        return jsonify({
+            "success": True,
+            "session_id": session_id,
+            "message": greeting,
+            "stage": session.current_stage
+        })
     except Exception as e:
-        print(f"Chatbot error: {e}")
-        return {
-            'response': "I'm here to help! Ask me about careers, colleges, or courses.",
-            'intent': 'error',
-            'suggestions': ['Career advice', 'Find colleges', 'Courses']
-        }
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@chatbot_bp.route('/chat/message', methods=['POST'])
+@cross_origin()
+def send_message():
+    """Handle user message and generate response"""
+    try:
+        data = request.json
+        session_id = data.get('session_id')
+        user_message = data.get('message', '').strip()
+        
+        if not session_id or session_id not in chat_sessions:
+            return jsonify({"success": False, "error": "Invalid session"}), 400
+        
+        if not user_message:
+            return jsonify({"success": False, "error": "Message is empty"}), 400
+        
+        session = chat_sessions[session_id]
+        
+        # Add user message to history
+        session.add_message("user", user_message)
+        
+        # Process response and update profile
+        process_user_response(session, user_message)
+        
+        # Check if we should generate recommendations
+        if session.current_stage == "analyze" or session.question_count >= session.max_questions:
+            recommendations = generate_recommendations(session)
+            
+            if recommendations:
+                response = f"Based on our conversation, here are my top career recommendations for you:\n\n"
+                for i, rec in enumerate(recommendations, 1):
+                    response += f"{i}. **{rec['title']}** (Match: {rec['match_score']})\n"
+                    response += f"   {rec['description']}\n"
+                    response += f"   💰 Salary: {rec['salary_range']} | 📈 Growth: {rec['growth_potential']}\n"
+                    response += f"   📚 Recommended Courses: {', '.join(rec['courses'][:2])}\n\n"
+                
+                response += "\nWould you like more details about any of these careers, or would you prefer to connect with a human counsellor?"
+            else:
+                response = "I need a bit more information to provide accurate recommendations. Could you tell me more about what you're passionate about?"
+                session.current_stage = "interests"
+            
+            session.add_message("bot", response)
+            
+            return jsonify({
+                "success": True,
+                "message": response,
+                "recommendations": recommendations,
+                "stage": "recommendations",
+                "session_id": session_id
+            })
+        
+        # Get next question
+        next_question = get_next_question(session)
+        session.add_message("bot", next_question)
+        
+        return jsonify({
+            "success": True,
+            "message": next_question,
+            "stage": session.current_stage,
+            "session_id": session_id,
+            "progress": round((session.question_count / session.max_questions) * 100)
+        })
+        
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@chatbot_bp.route('/chat/history/<session_id>', methods=['GET'])
+@cross_origin()
+def get_history(session_id):
+    """Get conversation history"""
+    try:
+        if session_id not in chat_sessions:
+            return jsonify({"success": False, "error": "Session not found"}), 404
+        
+        session = chat_sessions[session_id]
+        
+        return jsonify({
+            "success": True,
+            "history": session.conversation_history,
+            "profile": session.user_profile
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@chatbot_bp.route('/chat/end/<session_id>', methods=['POST'])
+@cross_origin()
+def end_chat(session_id):
+    """End chat session"""
+    try:
+        if session_id in chat_sessions:
+            session = chat_sessions[session_id]
+            history = session.conversation_history
+            profile = session.user_profile
+            
+            # Remove from active sessions
+            del chat_sessions[session_id]
+            
+            return jsonify({
+                "success": True,
+                "message": "Session ended",
+                "history": history,
+                "profile": profile
+            })
+        
+        return jsonify({"success": False, "error": "Session not found"}), 404
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@chatbot_bp.route('/chat/career-details/<career_id>', methods=['GET'])
+@cross_origin()
+def get_career_details(career_id):
+    """Get detailed information about a specific career"""
+    try:
+        if career_id in CAREER_DATABASE:
+            career = CAREER_DATABASE[career_id]
+            return jsonify({
+                "success": True,
+                "career": career
+            })
+        
+        return jsonify({"success": False, "error": "Career not found"}), 404
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# Export blueprint
+def init_chatbot(app):
+    """Initialize chatbot with Flask app"""
+    app.register_blueprint(chatbot_bp, url_prefix='/api')
+    print("✅ Chatbot module initialized")
