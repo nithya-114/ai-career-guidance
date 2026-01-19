@@ -23,7 +23,7 @@ import CounsellorDirectory from './pages/CounsellorDirectory';
 import ForgotPassword from './components/ForgotPassword';
 import AdminDashboard from './pages/AdminDashboard';
 import CounsellorDetails from './pages/CounsellorDetails';
-
+import CounsellorDashboard from './pages/CounsellorDashboard';
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();

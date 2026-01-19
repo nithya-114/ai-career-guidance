@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import PaymentButton from '../components/PaymentButton';
+import PaymentButton from './PaymentButton';
 
 function CounsellorDetails() {
   const { id } = useParams();

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import PaymentButton from '../components/PaymentButton';
+import PaymentButton from './PaymentButton';
 import { useNavigate } from 'react-router-dom';
 
 function CounsellorDirectory() {
