@@ -1,536 +1,98 @@
-/* Career Details Container */
-.career-details-container {
+/* Career Listing & Details Styles */
+
+.career-listing-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 2rem 0;
+  background: #f8f9fa;
 }
 
-/* Loading State */
-.career-details-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 60vh;
-  color: white;
+.career-details-page {
+  min-height: 100vh;
+  background: #f8f9fa;
 }
 
-.spinner {
-  width: 50px;
-  height: 50px;
-  border: 4px solid rgba(255, 255, 255, 0.3);
-  border-top-color: white;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 1rem;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* Error State */
-.career-details-error {
-  max-width: 600px;
-  margin: 4rem auto;
-  padding: 2rem;
-  background: white;
-  border-radius: 12px;
-  text-align: center;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-}
-
-.career-details-error h2 {
-  color: #e53e3e;
-  margin-bottom: 1rem;
-}
-
-.career-details-error p {
-  color: #666;
-  margin-bottom: 1.5rem;
-}
-
-/* Header */
+.career-header,
 .career-details-header {
-  max-width: 1200px;
-  margin: 0 auto 2rem;
-  padding: 0 1.5rem;
-}
-
-.btn-back {
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: white;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  margin-bottom: 1.5rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.btn-back:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: translateX(-5px);
-}
-
-.career-header-content {
-  background: white;
-  padding: 2rem;
-  border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-}
-
-.career-category-badge {
-  display: inline-block;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  margin-bottom: 1rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
-.career-title {
-  font-size: 2.5rem;
-  color: #2d3748;
-  margin-bottom: 0.75rem;
-  font-weight: 700;
-}
-
-.career-description {
-  font-size: 1.125rem;
-  color: #4a5568;
-  margin-bottom: 2rem;
-  line-height: 1.6;
-}
-
-/* Quick Stats */
-.career-quick-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.5rem;
-  margin-top: 2rem;
-}
-
-.stat-item {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  background: #f7fafc;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-}
-
-.stat-icon {
-  font-size: 2rem;
-}
-
-.stat-label {
-  display: block;
-  font-size: 0.875rem;
-  color: #718096;
-  margin-bottom: 0.25rem;
-}
-
-.stat-value {
-  display: block;
-  font-size: 1rem;
-  color: #2d3748;
-  font-weight: 600;
-}
-
-/* Main Content */
-.career-details-content {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 1.5rem;
-}
-
-.details-section {
-  background: white;
-  padding: 2rem;
-  border-radius: 16px;
-  margin-bottom: 2rem;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.details-section h2 {
-  font-size: 1.75rem;
-  color: #2d3748;
-  margin-bottom: 1.5rem;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.detailed-description {
-  font-size: 1.125rem;
-  color: #4a5568;
-  line-height: 1.8;
-}
-
-/* Education Content */
-.education-content {
-  display: grid;
-  gap: 2rem;
-}
-
-.education-item h3 {
-  font-size: 1.25rem;
-  color: #2d3748;
-  margin-bottom: 1rem;
-}
-
-.education-item p {
-  font-size: 1rem;
-  color: #4a5568;
-  line-height: 1.6;
-}
-
-/* Tags */
-.tag-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.tag {
-  padding: 0.5rem 1rem;
-  background: #edf2f7;
-  border-radius: 20px;
-  font-size: 0.875rem;
-  color: #4a5568;
-  font-weight: 500;
-}
-
-.exam-tag {
-  background: #e6fffa;
-  color: #234e52;
-  border: 1px solid #81e6d9;
-}
-
-/* Colleges List */
-.colleges-list {
-  list-style: none;
-  padding: 0;
-  display: grid;
-  gap: 0.75rem;
-}
-
-.colleges-list li {
-  padding: 1rem;
-  background: #f7fafc;
-  border-radius: 8px;
-  border-left: 4px solid #667eea;
-  font-size: 1rem;
-  color: #2d3748;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-/* Skills Grid */
-.skills-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 1rem;
-}
-
-.skill-card {
-  padding: 1rem;
-  background: #f7fafc;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  font-size: 0.975rem;
-  color: #2d3748;
+.career-card {
   transition: all 0.3s ease;
-}
-
-.skill-card:hover {
-  background: #edf2f7;
-  border-color: #cbd5e0;
-  transform: translateY(-2px);
-}
-
-/* Career Path */
-.career-path {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-  padding: 1rem;
-  background: #f7fafc;
-  border-radius: 12px;
-}
-
-.career-path-step {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  flex: 1;
-  min-width: 150px;
-}
-
-.step-number {
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 0.875rem;
-  flex-shrink: 0;
-}
-
-.step-content h4 {
-  font-size: 0.975rem;
-  color: #2d3748;
-  margin: 0;
-}
-
-.career-path-arrow {
-  color: #cbd5e0;
-  font-size: 1.5rem;
-  font-weight: bold;
-}
-
-/* Activity List */
-.activity-list {
-  list-style: none;
-  padding: 0;
-  display: grid;
-  gap: 0.75rem;
-}
-
-.activity-list li {
-  padding: 1rem;
-  background: #f7fafc;
-  border-radius: 8px;
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  font-size: 1rem;
-  color: #4a5568;
-}
-
-/* Companies Grid */
-.companies-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1rem;
-}
-
-.company-card {
-  padding: 1rem;
-  background: #f7fafc;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  font-size: 0.975rem;
-  color: #2d3748;
-  transition: all 0.3s ease;
-}
-
-.company-card:hover {
-  background: #edf2f7;
-  border-color: #cbd5e0;
-  transform: translateY(-2px);
-}
-
-/* Pros and Cons */
-.pros-cons-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 2rem;
-}
-
-.pros-section,
-.cons-section {
-  padding: 1.5rem;
-  border-radius: 12px;
-}
-
-.pros-section {
-  background: #f0fff4;
-  border: 1px solid #9ae6b4;
-}
-
-.cons-section {
-  background: #fff5f5;
-  border: 1px solid #fc8181;
-}
-
-.pros-section h3 {
-  color: #2f855a;
-  margin-bottom: 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.cons-section h3 {
-  color: #c53030;
-  margin-bottom: 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.pros-section ul,
-.cons-section ul {
-  list-style: none;
-  padding: 0;
-  display: grid;
-  gap: 0.75rem;
-}
-
-.pros-section li,
-.cons-section li {
-  padding: 0.75rem;
-  background: white;
-  border-radius: 6px;
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  font-size: 0.975rem;
-}
-
-.pros-section li {
-  color: #2f855a;
-}
-
-.cons-section li {
-  color: #c53030;
-}
-
-/* CTA Section */
-.cta-section {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  text-align: center;
-}
-
-.cta-section h2 {
-  color: white;
-  justify-content: center;
-}
-
-.cta-section p {
-  font-size: 1.125rem;
-  margin-bottom: 2rem;
-  opacity: 0.9;
-}
-
-.cta-buttons {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.btn-primary,
-.btn-secondary {
-  padding: 1rem 2rem;
   border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
+  border-radius: 12px;
+}
+
+.career-card:hover {
+  transform: translateY(-5px);
+}
+
+.hover-shadow:hover {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
+}
+
+.career-info {
+  border-top: 1px solid #e9ecef;
+  padding-top: 1rem;
+}
+
+.career-card .btn {
   transition: all 0.3s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
 }
 
-.btn-primary {
-  background: white;
-  color: #667eea;
+.career-card .btn:hover {
+  transform: translateX(5px);
 }
 
-.btn-primary:hover {
-  background: #f7fafc;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+/* Career Details Specific */
+.career-stage {
+  position: relative;
+  padding-left: 2rem;
+  border-left: 2px solid #198754;
 }
 
-.btn-secondary {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  border: 2px solid white;
+.career-stage:last-child {
+  border-left: none;
 }
 
-.btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: translateY(-2px);
+.stage-number {
+  position: absolute;
+  left: -15px;
 }
 
-/* Responsive Design */
+/* Responsive */
 @media (max-width: 768px) {
-  .career-title {
+  .career-header h1,
+  .career-details-header h1 {
     font-size: 2rem;
   }
-  
-  .career-quick-stats {
-    grid-template-columns: 1fr;
-  }
-  
-  .career-path {
-    flex-direction: column;
-  }
-  
-  .career-path-arrow {
-    transform: rotate(90deg);
-  }
-  
-  .pros-cons-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .cta-buttons {
-    flex-direction: column;
-  }
-  
-  .btn-primary,
-  .btn-secondary {
-    width: 100%;
-    justify-content: center;
+
+  .career-card {
+    margin-bottom: 1rem;
   }
 }
 
-@media (max-width: 480px) {
-  .career-details-container {
-    padding: 1rem 0;
-  }
-  
-  .career-header-content,
-  .details-section {
-    padding: 1.5rem;
-  }
-  
-  .career-title {
-    font-size: 1.75rem;
-  }
-  
-  .skills-grid,
-  .companies-grid {
-    grid-template-columns: 1fr;
-  }
+/* Badge Styles */
+.badge {
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
+/* List Group */
+.list-group-item {
+  border-left: none;
+  border-right: none;
+}
+
+.list-group-item:first-child {
+  border-top: none;
+}
+
+.list-group-item:last-child {
+  border-bottom: none;
+}
+
+/* Sticky Sidebar */
+.sticky-top {
+  position: sticky;
+  z-index: 100;
 }

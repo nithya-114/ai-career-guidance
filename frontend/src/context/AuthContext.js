@@ -19,54 +19,76 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
+  // ✅ Check authentication on app load
   const checkAuth = async () => {
     const token = localStorage.getItem('token');
-    if (token) {
-      try {
-        const response = await authAPI.getProfile();
-        setUser(response.data);
-      } catch (error) {
-        console.error('Auth check failed:', error);
-        localStorage.removeItem('token');
-      }
+
+    if (!token) {
+      setUser(null);
+      setLoading(false);
+      return;
     }
-    setLoading(false);
+
+    try {
+      const response = await authAPI.getProfile();
+      setUser(response.data);
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      localStorage.removeItem('token');
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // ✅ Login
   const login = async (credentials) => {
     try {
       const response = await authAPI.login(credentials);
-      localStorage.setItem('token', response.data.token);
-      setUser(response.data.user);
-      return { success: true };
+
+      const { token, user: userData } = response.data;
+
+      localStorage.setItem('token', token);
+      setUser(userData);
+
+      return { success: true, user: userData };
     } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.error || 'Login failed' 
+      console.error('Login error:', error);
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Login failed'
       };
     }
   };
 
+  // ✅ Register
   const register = async (userData) => {
     try {
       const response = await authAPI.register(userData);
-      localStorage.setItem('token', response.data.token);
-      setUser(response.data.user);
-      return { success: true };
+
+      const { token, user: newUser } = response.data;
+
+      localStorage.setItem('token', token);
+      setUser(newUser);
+
+      return { success: true, user: newUser };
     } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.error || 'Registration failed' 
+      console.error('Registration error:', error);
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Registration failed'
       };
     }
   };
 
+  // ✅ Logout
   const logout = () => {
     localStorage.removeItem('token');
     setUser(null);
     window.location.href = '/';
   };
 
+  // ✅ Update profile (extra feature from first code)
   const updateUserProfile = async (profileData) => {
     try {
       await authAPI.updateProfile(profileData);
@@ -74,22 +96,23 @@ export const AuthProvider = ({ children }) => {
       setUser(response.data);
       return { success: true };
     } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.error || 'Profile update failed' 
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Profile update failed'
       };
     }
   };
 
   return (
-    <AuthContext.Provider 
-      value={{ 
-        user, 
-        loading, 
-        login, 
-        register, 
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        register,
         logout,
-        updateUserProfile 
+        checkAuth,
+        updateUserProfile
       }}
     >
       {children}

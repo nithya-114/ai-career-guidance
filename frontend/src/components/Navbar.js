@@ -19,7 +19,7 @@ function NavigationBar() {
         {/* Logo/Brand */}
         <Link className="navbar-brand fw-bold" to={user ? "/dashboard" : "/"}>
           <i className="bi bi-mortarboard-fill me-2"></i>
-          CareerGuide AI
+          AI Based Career Counselling
         </Link>
 
         {/* Mobile Toggle */}

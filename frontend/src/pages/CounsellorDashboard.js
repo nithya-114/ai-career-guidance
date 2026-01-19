@@ -18,6 +18,14 @@ function CounsellorDashboard() {
     pendingPayments: 0
   });
   const [loading, setLoading] = useState(true);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    specialization: '',
+    experience: '',
+    education: '',
+    hourly_rate: '',
+    bio: ''
+  });
 
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -41,8 +49,17 @@ function CounsellorDashboard() {
       
       setProfileData(profileResponse.data);
       
-      // Calculate stats from profile
+      // Set form data for editing
       const profile = profileResponse.data.profile || {};
+      setProfileForm({
+        specialization: profile.specialization || '',
+        experience: profile.experience || '',
+        education: profile.education || '',
+        hourly_rate: profile.hourly_rate || '',
+        bio: profile.bio || ''
+      });
+      
+      // Calculate stats from profile
       setStats({
         totalSessions: profile.sessions_conducted || 0,
         averageRating: profile.rating || 4.5,
@@ -52,16 +69,41 @@ function CounsellorDashboard() {
         pendingPayments: 0
       });
 
-      // TODO: Fetch appointments from backend
-      // const appointmentsResponse = await axios.get(`${API_URL}/counsellor/appointments`, {
-      //   headers: { Authorization: `Bearer ${token}` }
-      // });
-      // setAppointments(appointmentsResponse.data.appointments);
+      // Fetch appointments
+      try {
+        const appointmentsResponse = await axios.get(`${API_URL}/counsellor/appointments`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        console.log('Appointments:', appointmentsResponse.data);
+        setAppointments(appointmentsResponse.data.appointments || []);
+      } catch (error) {
+        console.error('Error fetching appointments:', error);
+        // Don't fail the whole page if appointments fail
+      }
 
       setLoading(false);
     } catch (error) {
       console.error('Error fetching counsellor data:', error);
       setLoading(false);
+    }
+  };
+
+  const handleProfileUpdate = async (e) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.put(
+        `${API_URL}/user/profile`,
+        { profile: profileForm },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      alert('✅ Profile updated successfully!');
+      setShowProfileModal(false);
+      fetchCounsellorData(); // Refresh data
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      alert('❌ Failed to update profile: ' + (error.response?.data?.message || error.message));
     }
   };
 
@@ -78,7 +120,14 @@ function CounsellorDashboard() {
       icon: '👥',
       title: 'My Students',
       description: 'View your student list',
-      action: () => alert('Students list coming soon!'),
+      action: () => {
+        if (appointments.length > 0) {
+          // Scroll to appointments section
+          document.getElementById('appointments-section')?.scrollIntoView({ behavior: 'smooth' });
+        } else {
+          alert('No students yet. Students will appear after they book sessions.');
+        }
+      },
       color: 'success',
       bgColor: '#e8f5e9'
     },
@@ -102,7 +151,7 @@ function CounsellorDashboard() {
       icon: '⚙️',
       title: 'Settings',
       description: 'Update your profile',
-      action: () => navigate('/profile'),
+      action: () => setShowProfileModal(true),
       color: 'secondary',
       bgColor: '#f3e5f5'
     },
@@ -128,6 +177,87 @@ function CounsellorDashboard() {
 
   return (
     <div className="container-fluid py-4">
+      {/* Profile Edit Modal */}
+      {showProfileModal && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Edit Profile</h5>
+                <button type="button" className="btn-close" onClick={() => setShowProfileModal(false)}></button>
+              </div>
+              <form onSubmit={handleProfileUpdate}>
+                <div className="modal-body">
+                  <div className="mb-3">
+                    <label className="form-label">Specialization</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={profileForm.specialization}
+                      onChange={(e) => setProfileForm({...profileForm, specialization: e.target.value})}
+                      placeholder="e.g., Career Guidance, Technology"
+                      required
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Experience (years)</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={profileForm.experience}
+                      onChange={(e) => setProfileForm({...profileForm, experience: e.target.value})}
+                      placeholder="Years of experience"
+                      required
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Education</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={profileForm.education}
+                      onChange={(e) => setProfileForm({...profileForm, education: e.target.value})}
+                      placeholder="e.g., M.Ed, PhD in Psychology"
+                      required
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Hourly Rate (₹)</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={profileForm.hourly_rate}
+                      onChange={(e) => setProfileForm({...profileForm, hourly_rate: e.target.value})}
+                      placeholder="500"
+                      required
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Bio</label>
+                    <textarea
+                      className="form-control"
+                      rows="4"
+                      value={profileForm.bio}
+                      onChange={(e) => setProfileForm({...profileForm, bio: e.target.value})}
+                      placeholder="Tell students about yourself and your expertise..."
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowProfileModal(false)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary">
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Welcome Section */}
       <div className="row mb-4">
         <div className="col-12">
@@ -202,33 +332,39 @@ function CounsellorDashboard() {
 
       {/* Today's Schedule */}
       <div className="row">
-        <div className="col-lg-8 mb-4">
+        <div className="col-lg-8 mb-4" id="appointments-section">
           <div className="card border-0 shadow-sm">
             <div className="card-body">
-              <h5 className="card-title mb-4">Today's Appointments</h5>
+              <h5 className="card-title mb-4">All Appointments</h5>
               {appointments.length === 0 ? (
                 <div className="text-center py-5 text-muted">
-                  <p className="mb-0">No appointments scheduled for today</p>
-                  <small>Students will appear here after booking sessions</small>
+                  <p className="mb-0">No appointments yet</p>
+                  <small>Students will appear here after booking sessions with you</small>
                 </div>
               ) : (
                 <div className="table-responsive">
                   <table className="table">
                     <thead>
                       <tr>
-                        <th>Time</th>
+                        <th>Date</th>
                         <th>Student</th>
+                        <th>Email</th>
+                        <th>Amount</th>
                         <th>Status</th>
-                        <th>Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {appointments.map((apt, index) => (
                         <tr key={index}>
-                          <td>{apt.time}</td>
+                          <td>{new Date(apt.created_at).toLocaleDateString()}</td>
                           <td>{apt.student_name}</td>
-                          <td><span className="badge bg-success">Confirmed</span></td>
-                          <td><button className="btn btn-sm btn-primary">View</button></td>
+                          <td>{apt.student_email}</td>
+                          <td>₹{apt.amount}</td>
+                          <td>
+                            <span className={`badge bg-${apt.status === 'confirmed' ? 'success' : 'warning'}`}>
+                              {apt.status}
+                            </span>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -244,11 +380,12 @@ function CounsellorDashboard() {
           <div className="card border-0 shadow-sm">
             <div className="card-body">
               <h5 className="card-title mb-4">Your Profile</h5>
-              <p><strong>Specialization:</strong><br/>{profileData?.profile?.specialization}</p>
-              <p><strong>Experience:</strong><br/>{profileData?.profile?.experience} years</p>
-              <p><strong>Education:</strong><br/>{profileData?.profile?.education}</p>
-              <p><strong>Hourly Rate:</strong><br/>₹{profileData?.profile?.hourly_rate}</p>
-              <button className="btn btn-primary w-100 mt-2" onClick={() => navigate('/profile')}>
+              <p><strong>Specialization:</strong><br/>{profileData?.profile?.specialization || 'Not set'}</p>
+              <p><strong>Experience:</strong><br/>{profileData?.profile?.experience || 0} years</p>
+              <p><strong>Education:</strong><br/>{profileData?.profile?.education || 'Not set'}</p>
+              <p><strong>Hourly Rate:</strong><br/>₹{profileData?.profile?.hourly_rate || 500}</p>
+              <p><strong>Bio:</strong><br/>{profileData?.profile?.bio || 'Not set'}</p>
+              <button className="btn btn-primary w-100 mt-2" onClick={() => setShowProfileModal(true)}>
                 Edit Profile
               </button>
             </div>

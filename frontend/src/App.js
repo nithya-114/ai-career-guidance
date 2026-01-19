@@ -24,6 +24,7 @@ import ForgotPassword from './components/ForgotPassword';
 import AdminDashboard from './pages/AdminDashboard';
 import CounsellorDetails from './pages/CounsellorDetails';
 import CounsellorDashboard from './pages/CounsellorDashboard';
+import BookCounsellor from './pages/BookCounsellor';
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
@@ -206,6 +207,17 @@ function AppContent() {
             }
           />
 
+          {/* ===== COUNSELLOR ROUTES - ADDED ===== */}
+          <Route
+            path="/counsellor-dashboard"
+            element={
+              <ProtectedRoute allowedRoles={['counsellor']}>
+                <CounsellorDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Profile Route - Available to all authenticated users */}
           <Route
             path="/profile"
             element={
@@ -215,6 +227,7 @@ function AppContent() {
             }
           />
 
+          {/* Student-only Routes */}
           <Route
             path="/chat"
             element={

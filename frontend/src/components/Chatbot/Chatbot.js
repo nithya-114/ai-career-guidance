@@ -6,9 +6,9 @@ import './Chatbot.css';
 const API_URL = 'http://localhost:5000/api';
 
 const Chatbot = () => {
+  const [sessionId, setSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
-  const [sessionId, setSessionId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [recommendations, setRecommendations] = useState([]);
@@ -25,7 +25,6 @@ const Chatbot = () => {
 
   useEffect(() => {
     startChat();
-    // Cleanup function
     return () => {
       if (sessionId) {
         endChat();
@@ -138,11 +137,12 @@ const Chatbot = () => {
   };
 
   const formatMessage = (content) => {
-    // Convert markdown-style formatting
-    let formatted = content
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\n/g, '<br/>');
-    return { __html: formatted };
+    return content.split('\n').map((line, i) => (
+      <React.Fragment key={i}>
+        {line}
+        {i < content.split('\n').length - 1 && <br />}
+      </React.Fragment>
+    ));
   };
 
   const viewCareerDetails = async (careerId) => {
@@ -157,115 +157,163 @@ const Chatbot = () => {
   };
 
   return (
-    <div className="chatbot-container">
-      <div className="chatbot-header">
-        <div className="header-content">
-          <h2>🤖 AI Career Counsellor</h2>
-          <p>Let's discover your perfect career path!</p>
-        </div>
-        <button className="reset-btn" onClick={resetChat} title="Start New Session">
-          🔄 Reset
-        </button>
-      </div>
-
-      {progress > 0 && progress < 100 && (
-        <div className="progress-bar-container">
-          <div className="progress-bar" style={{ width: `${progress}%` }}>
-            <span className="progress-text">{progress}%</span>
-          </div>
-        </div>
-      )}
-
-      <div className="chatbot-messages">
-        {messages.map((msg, index) => (
-          <div key={index} className={`message ${msg.role}`}>
-            <div className="message-avatar">
-              {msg.role === 'bot' ? '🤖' : '👤'}
+    <div className="chatbot-wrapper">
+      <div className="chatbot-container">
+        {/* Header */}
+        <div className="chatbot-header">
+          <div className="header-left">
+            <div className="bot-avatar-large">
+              <span className="icon-sparkles">✨</span>
             </div>
-            <div className="message-content">
-              <div 
-                className="message-text"
-                dangerouslySetInnerHTML={formatMessage(msg.content)}
-              />
-              <span className="message-time">
-                {new Date(msg.timestamp).toLocaleTimeString()}
-              </span>
+            <div className="header-text">
+              <h1 className="header-title">
+                AI Career Counsellor
+                <span className="status-badge">
+                  <span className="status-dot"></span>
+                  Online
+                </span>
+              </h1>
+              <p className="header-subtitle">Your personalized career discovery assistant</p>
             </div>
           </div>
-        ))}
+          <button onClick={resetChat} className="reset-button">
+            <span className="icon-rotate">🔄</span>
+            <span className="reset-text">New Session</span>
+          </button>
+        </div>
 
-        {isLoading && (
-          <div className="message bot">
-            <div className="message-avatar">🤖</div>
-            <div className="message-content">
-              <div className="typing-indicator">
-                <span></span>
-                <span></span>
-                <span></span>
-              </div>
+        {/* Progress Bar */}
+        {progress > 0 && progress < 100 && (
+          <div className="progress-section">
+            <div className="progress-info">
+              <span className="progress-label">Discovery Progress</span>
+              <span className="progress-percentage">{progress}%</span>
+            </div>
+            <div className="progress-bar-outer">
+              <div className="progress-bar-inner" style={{ width: `${progress}%` }}></div>
             </div>
           </div>
         )}
 
-        <div ref={messagesEndRef} />
-      </div>
-
-      {showRecommendations && recommendations.length > 0 && (
-        <div className="recommendations-panel">
-          <h3>🎯 Your Career Recommendations</h3>
-          <div className="recommendations-grid">
-            {recommendations.map((rec, index) => (
-              <div key={index} className="recommendation-card">
-                <div className="rec-header">
-                  <h4>{rec.title}</h4>
-                  <span className="match-badge">
-                    {Math.round((rec.match_score / 20) * 100)}% Match
-                  </span>
-                </div>
-                <p className="rec-description">{rec.description}</p>
-                <div className="rec-details">
-                  <div className="rec-detail">
-                    <span className="detail-icon">💰</span>
-                    <span>{rec.salary_range}</span>
-                  </div>
-                  <div className="rec-detail">
-                    <span className="detail-icon">📈</span>
-                    <span>{rec.growth_potential}</span>
-                  </div>
-                </div>
-                <div className="rec-courses">
-                  <strong>📚 Courses:</strong>
-                  <p>{rec.courses.slice(0, 2).join(', ')}</p>
-                </div>
-                <button 
-                  className="view-details-btn"
-                  onClick={() => viewCareerDetails(rec.career_id)}
-                >
-                  View Details
-                </button>
+        {/* Messages Area */}
+        <div className="messages-area">
+          {messages.map((msg, index) => (
+            <div key={index} className={`message-wrapper ${msg.role === 'user' ? 'user-message' : 'bot-message'}`}>
+              <div className={`message-avatar ${msg.role}`}>
+                {msg.role === 'bot' ? (
+                  <span className="avatar-icon">🤖</span>
+                ) : (
+                  <span className="avatar-icon">👤</span>
+                )}
               </div>
-            ))}
+              
+              <div className="message-content-wrapper">
+                <div className={`message-bubble ${msg.role}`}>
+                  <p className="message-text">{formatMessage(msg.content)}</p>
+                </div>
+                <span className="message-timestamp">
+                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            </div>
+          ))}
+
+          {isLoading && (
+            <div className="message-wrapper bot-message">
+              <div className="message-avatar bot">
+                <span className="avatar-icon">🤖</span>
+              </div>
+              <div className="message-content-wrapper">
+                <div className="message-bubble bot">
+                  <div className="typing-indicator">
+                    <div className="typing-dot"></div>
+                    <div className="typing-dot"></div>
+                    <div className="typing-dot"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Recommendations Panel */}
+        {showRecommendations && recommendations.length > 0 && (
+          <div className="recommendations-section">
+            <div className="recommendations-header">
+              <span className="rec-icon">⚡</span>
+              <h3 className="rec-title">Your Top Career Matches</h3>
+            </div>
+            
+            <div className="recommendations-grid">
+              {recommendations.map((rec, index) => (
+                <div key={index} className="recommendation-card">
+                  <div className="rec-card-header">
+                    <h4 className="rec-card-title">{rec.title}</h4>
+                    <span className="match-score">
+                      {Math.round((rec.match_score / 20) * 100)}%
+                    </span>
+                  </div>
+                  
+                  <p className="rec-description">{rec.description}</p>
+                  
+                  <div className="rec-info">
+                    <div className="rec-info-item">
+                      <span className="info-icon">💰</span>
+                      <span>{rec.salary_range}</span>
+                    </div>
+                    <div className="rec-info-item">
+                      <span className="info-icon">📈</span>
+                      <span>{rec.growth_potential} Growth</span>
+                    </div>
+                  </div>
+                  
+                  <div className="rec-courses">
+                    <div className="courses-header">
+                      <span className="courses-icon">📚</span>
+                      <span className="courses-label">Recommended Courses</span>
+                    </div>
+                    <p className="courses-list">{rec.courses.slice(0, 2).join(', ')}</p>
+                  </div>
+                  
+                  <button onClick={() => viewCareerDetails(rec.career_id)} className="details-button">
+                    View Details
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Input Area */}
+        <div className="input-section">
+          <div className="input-container">
+            <div className="input-wrapper">
+              <textarea
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Share your thoughts, interests, or ask me anything..."
+                disabled={isLoading}
+                rows="1"
+                className="message-input"
+              />
+              <div className="char-counter">{inputMessage.length}/500</div>
+            </div>
+            <button
+              onClick={sendMessage}
+              disabled={isLoading || !inputMessage.trim()}
+              className="send-button"
+            >
+              {isLoading ? (
+                <div className="spinner"></div>
+              ) : (
+                <span className="send-icon">📤</span>
+              )}
+            </button>
           </div>
         </div>
-      )}
-
-      <div className="chatbot-input">
-        <textarea
-          value={inputMessage}
-          onChange={(e) => setInputMessage(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder="Type your message here..."
-          disabled={isLoading}
-          rows="1"
-        />
-        <button 
-          onClick={sendMessage} 
-          disabled={isLoading || !inputMessage.trim()}
-          className="send-btn"
-          title="Send message"
-        >
-          {isLoading ? '⏳' : '📤'}
-        </button>
       </div>
     </div>
   );

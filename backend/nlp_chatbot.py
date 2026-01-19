@@ -1,13 +1,9 @@
-# nlp_chatbot.py
+# nlp_chatbot_improved.py
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 import spacy
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-import re
 from datetime import datetime
-import numpy as np
-from collections import Counter
+import re
 
 # Create Blueprint
 chatbot_bp = Blueprint('chatbot', __name__)
@@ -15,15 +11,17 @@ chatbot_bp = Blueprint('chatbot', __name__)
 # Load spaCy model
 try:
     nlp = spacy.load("en_core_web_sm")
+    print("✅ SpaCy model loaded successfully")
 except:
-    print("Please install: python -m spacy download en_core_web_sm")
+    print("⚠️ Please install: python -m spacy download en_core_web_sm")
     nlp = None
 
 # ==================== CAREER DATABASE ====================
 CAREER_DATABASE = {
     "software_engineer": {
         "title": "Software Engineer",
-        "keywords": ["coding", "programming", "software", "computer", "technology", "app", "website", "algorithm", "developer", "it", "python", "java"],
+        "keywords": ["coding", "programming", "software", "computer", "technology", "app", "website", 
+                     "algorithm", "developer", "it", "python", "java", "code", "tech", "build"],
         "skills": ["problem-solving", "logical", "analytical", "creative", "detail-oriented"],
         "personality": ["introvert", "patient", "curious", "innovative", "focused"],
         "courses": ["Computer Science", "Software Engineering", "Information Technology", "Computer Applications"],
@@ -33,7 +31,8 @@ CAREER_DATABASE = {
     },
     "data_scientist": {
         "title": "Data Scientist",
-        "keywords": ["data", "analysis", "statistics", "machine-learning", "ai", "research", "analytics", "python", "math", "algorithms"],
+        "keywords": ["data", "analysis", "statistics", "machine-learning", "ai", "research", "analytics", 
+                     "python", "math", "algorithms", "ml", "artificial intelligence"],
         "skills": ["analytical", "mathematical", "problem-solving", "programming", "statistical"],
         "personality": ["logical", "curious", "detail-oriented", "patient"],
         "courses": ["Data Science", "Statistics", "Computer Science", "Mathematics", "AI/ML"],
@@ -43,7 +42,8 @@ CAREER_DATABASE = {
     },
     "doctor": {
         "title": "Medical Doctor",
-        "keywords": ["medicine", "health", "patient", "care", "biology", "science", "heal", "hospital", "medical", "surgery"],
+        "keywords": ["medicine", "health", "patient", "care", "biology", "science", "heal", "hospital", 
+                     "medical", "surgery", "doctor", "physician", "treatment"],
         "skills": ["empathy", "precision", "communication", "problem-solving", "analytical"],
         "personality": ["caring", "patient", "hardworking", "compassionate", "responsible"],
         "courses": ["MBBS", "Medicine", "Biology", "Pre-Medical Studies"],
@@ -53,7 +53,8 @@ CAREER_DATABASE = {
     },
     "teacher": {
         "title": "Teacher/Educator",
-        "keywords": ["teaching", "education", "students", "learning", "explain", "knowledge", "school", "tutor", "training"],
+        "keywords": ["teaching", "education", "students", "learning", "explain", "knowledge", "school", 
+                     "tutor", "training", "teach", "professor", "instructor"],
         "skills": ["communication", "patience", "creativity", "leadership", "empathy"],
         "personality": ["extrovert", "patient", "caring", "organized", "enthusiastic"],
         "courses": ["Education", "B.Ed", "Subject Specialization", "Teaching Certification"],
@@ -63,7 +64,8 @@ CAREER_DATABASE = {
     },
     "business_analyst": {
         "title": "Business Analyst",
-        "keywords": ["business", "analysis", "data", "strategy", "management", "finance", "market", "analytics", "consulting"],
+        "keywords": ["business", "analysis", "data", "strategy", "management", "finance", "market", 
+                     "analytics", "consulting", "commerce", "economics"],
         "skills": ["analytical", "communication", "problem-solving", "critical-thinking", "strategic"],
         "personality": ["logical", "detail-oriented", "strategic", "communicative"],
         "courses": ["Business Administration", "Management", "Economics", "Data Analytics", "MBA"],
@@ -73,7 +75,8 @@ CAREER_DATABASE = {
     },
     "graphic_designer": {
         "title": "Graphic Designer",
-        "keywords": ["design", "creative", "art", "visual", "graphics", "illustration", "photoshop", "drawing", "aesthetic"],
+        "keywords": ["design", "creative", "art", "visual", "graphics", "illustration", "photoshop", 
+                     "drawing", "aesthetic", "ui", "ux", "creative", "artist"],
         "skills": ["creativity", "visual-thinking", "attention-to-detail", "artistic", "innovative"],
         "personality": ["creative", "artistic", "imaginative", "visual", "expressive"],
         "courses": ["Graphic Design", "Visual Arts", "Fine Arts", "Digital Design", "Animation"],
@@ -83,7 +86,8 @@ CAREER_DATABASE = {
     },
     "civil_engineer": {
         "title": "Civil Engineer",
-        "keywords": ["construction", "buildings", "infrastructure", "engineering", "structure", "architecture", "design", "planning"],
+        "keywords": ["construction", "buildings", "infrastructure", "engineering", "structure", 
+                     "architecture", "design", "planning", "civil", "bridge", "road"],
         "skills": ["problem-solving", "analytical", "precision", "planning", "technical"],
         "personality": ["practical", "detail-oriented", "organized", "systematic"],
         "courses": ["Civil Engineering", "Structural Engineering", "Construction Management"],
@@ -93,7 +97,8 @@ CAREER_DATABASE = {
     },
     "lawyer": {
         "title": "Lawyer",
-        "keywords": ["law", "legal", "court", "justice", "advocate", "attorney", "rights", "litigation"],
+        "keywords": ["law", "legal", "court", "justice", "advocate", "attorney", "rights", 
+                     "litigation", "lawyer", "judge", "case"],
         "skills": ["communication", "analytical", "persuasion", "research", "argumentation"],
         "personality": ["confident", "articulate", "logical", "argumentative", "ambitious"],
         "courses": ["Law", "LLB", "Legal Studies", "Criminal Justice"],
@@ -103,7 +108,8 @@ CAREER_DATABASE = {
     },
     "digital_marketer": {
         "title": "Digital Marketing Specialist",
-        "keywords": ["marketing", "social-media", "advertising", "content", "seo", "digital", "branding", "campaigns"],
+        "keywords": ["marketing", "social-media", "advertising", "content", "seo", "digital", 
+                     "branding", "campaigns", "social media", "online"],
         "skills": ["creativity", "communication", "analytical", "strategic", "persuasion"],
         "personality": ["extrovert", "creative", "strategic", "adaptable"],
         "courses": ["Marketing", "Digital Marketing", "Business", "Communications", "MBA"],
@@ -113,7 +119,8 @@ CAREER_DATABASE = {
     },
     "mechanical_engineer": {
         "title": "Mechanical Engineer",
-        "keywords": ["mechanical", "machines", "manufacturing", "engineering", "design", "automotive", "production"],
+        "keywords": ["mechanical", "machines", "manufacturing", "engineering", "design", "automotive", 
+                     "production", "engine", "machinery"],
         "skills": ["problem-solving", "analytical", "technical", "precision", "innovative"],
         "personality": ["practical", "detail-oriented", "logical", "hands-on"],
         "courses": ["Mechanical Engineering", "Automobile Engineering", "Manufacturing"],
@@ -123,7 +130,8 @@ CAREER_DATABASE = {
     },
     "psychologist": {
         "title": "Psychologist",
-        "keywords": ["psychology", "mental-health", "counseling", "therapy", "behavior", "mind", "emotions"],
+        "keywords": ["psychology", "mental-health", "counseling", "therapy", "behavior", "mind", 
+                     "emotions", "mental", "therapist", "counselor"],
         "skills": ["empathy", "listening", "analytical", "communication", "patience"],
         "personality": ["caring", "patient", "understanding", "intuitive", "compassionate"],
         "courses": ["Psychology", "Clinical Psychology", "Counseling", "Mental Health"],
@@ -133,7 +141,8 @@ CAREER_DATABASE = {
     },
     "chartered_accountant": {
         "title": "Chartered Accountant",
-        "keywords": ["accounting", "finance", "taxation", "audit", "numbers", "ca", "financial", "money"],
+        "keywords": ["accounting", "finance", "taxation", "audit", "numbers", "ca", "financial", 
+                     "money", "accounts", "tax"],
         "skills": ["analytical", "attention-to-detail", "mathematical", "organized", "ethical"],
         "personality": ["detail-oriented", "logical", "systematic", "responsible"],
         "courses": ["Commerce", "Accounting", "CA", "Finance", "Taxation"],
@@ -155,12 +164,11 @@ class ChatSession:
             "skills": [],
             "personality": [],
             "subjects": [],
-            "hobbies": []
+            "hobbies": [],
+            "dislikes": []
         }
-        self.current_stage = "greeting"
-        self.question_count = 0
-        self.max_questions = 8
-        self.career_scores = {}
+        self.context = "greeting"
+        self.has_basic_info = False
         
     def add_message(self, role, content):
         self.conversation_history.append({
@@ -169,146 +177,240 @@ class ChatSession:
             "timestamp": datetime.now().isoformat()
         })
 
-# ==================== NLP PROCESSING ====================
-def extract_keywords(text):
-    """Extract keywords using spaCy"""
+# ==================== IMPROVED NLP PROCESSING ====================
+def extract_keywords_advanced(text):
+    """Extract meaningful keywords using spaCy with better filtering"""
     if not nlp:
         return text.lower().split()
     
     doc = nlp(text.lower())
     keywords = []
     
-    # Extract nouns, verbs, and adjectives
+    # Extract nouns, verbs, adjectives, and proper nouns
     for token in doc:
-        if token.pos_ in ['NOUN', 'VERB', 'ADJ'] and not token.is_stop:
+        if token.pos_ in ['NOUN', 'VERB', 'ADJ', 'PROPN'] and not token.is_stop and len(token.text) > 2:
             keywords.append(token.lemma_)
+    
+    # Also extract noun chunks (multi-word phrases)
+    for chunk in doc.noun_chunks:
+        if len(chunk.text.split()) > 1:  # Multi-word phrases
+            keywords.append(chunk.text.lower())
     
     return keywords if keywords else text.lower().split()
 
-def analyze_sentiment(text):
-    """Basic sentiment analysis"""
-    positive_words = ['love', 'enjoy', 'like', 'passion', 'interested', 'excited', 'great', 'good', 'excellent']
-    negative_words = ['hate', 'dislike', 'boring', 'difficult', 'hard', 'not']
+def detect_intent(text):
+    """Detect user intent from message"""
+    text_lower = text.lower()
+    
+    # Greeting intents
+    if any(word in text_lower for word in ['hi', 'hello', 'hey', 'greetings', 'good morning', 'good afternoon']):
+        return 'greeting'
+    
+    # Question intents
+    if any(word in text_lower for word in ['what is', 'what are', 'tell me about', 'explain', 'how to', 'can you']):
+        return 'question'
+    
+    # Recommendation intents
+    if any(phrase in text_lower for phrase in ['recommend', 'suggest', 'which career', 'what career', 
+                                                 'best career', 'job for', 'which job', 'what should i',
+                                                 'help me choose', 'career options']):
+        return 'recommend'
+    
+    # Details intent
+    if any(phrase in text_lower for phrase in ['more about', 'details', 'tell me more', 'information about',
+                                                 'learn more', 'know more']):
+        return 'details'
+    
+    # Interest/skill sharing
+    if any(word in text_lower for word in ['like', 'love', 'enjoy', 'interested', 'good at', 'skilled', 'passion']):
+        return 'sharing_interest'
+    
+    # Dislike sharing
+    if any(word in text_lower for word in ['hate', 'dislike', 'not good at', 'boring', 'don\'t like']):
+        return 'sharing_dislike'
+    
+    # Affirmation
+    if text_lower in ['yes', 'yeah', 'yep', 'sure', 'ok', 'okay', 'definitely', 'of course']:
+        return 'affirmation'
+    
+    # Negation
+    if text_lower in ['no', 'nope', 'nah', 'not really', 'i don\'t think so']:
+        return 'negation'
+    
+    return 'general'
+
+def extract_entities(text):
+    """Extract named entities like subjects, skills, hobbies"""
+    entities = {
+        'subjects': [],
+        'skills': [],
+        'hobbies': [],
+        'personality': []
+    }
     
     text_lower = text.lower()
-    pos_count = sum(1 for word in positive_words if word in text_lower)
-    neg_count = sum(1 for word in negative_words if word in text_lower)
     
-    if pos_count > neg_count:
-        return "positive"
-    elif neg_count > pos_count:
-        return "negative"
-    return "neutral"
+    # Subject detection
+    subjects = ['math', 'mathematics', 'physics', 'chemistry', 'biology', 'history', 'geography', 
+                'english', 'computer', 'science', 'economics', 'commerce', 'arts', 'literature',
+                'political science', 'sociology', 'psychology']
+    for subject in subjects:
+        if subject in text_lower:
+            entities['subjects'].append(subject)
+    
+    # Skills detection
+    skills = ['programming', 'coding', 'communication', 'leadership', 'problem-solving', 'analytical',
+              'creative', 'writing', 'speaking', 'designing', 'drawing', 'teamwork', 'management',
+              'organization', 'planning', 'research']
+    for skill in skills:
+        if skill in text_lower or skill.replace('-', ' ') in text_lower:
+            entities['skills'].append(skill)
+    
+    # Hobby detection
+    hobbies = ['reading', 'writing', 'painting', 'drawing', 'music', 'singing', 'dancing', 'sports',
+               'football', 'cricket', 'basketball', 'coding', 'gaming', 'photography', 'cooking',
+               'gardening', 'traveling', 'volunteering']
+    for hobby in hobbies:
+        if hobby in text_lower:
+            entities['hobbies'].append(hobby)
+    
+    # Personality traits
+    traits = ['introvert', 'extrovert', 'creative', 'logical', 'organized', 'spontaneous', 'patient',
+              'ambitious', 'detail-oriented', 'big-picture', 'analytical', 'emotional', 'practical']
+    for trait in traits:
+        if trait in text_lower:
+            entities['personality'].append(trait)
+    
+    return entities
 
 def calculate_career_match(user_profile):
-    """Calculate match score for each career"""
+    """Calculate match score for each career based on user profile"""
     scores = {}
     
     for career_id, career_data in CAREER_DATABASE.items():
         score = 0
         
-        # Match interests with keywords
+        # Match interests with keywords (high weight)
         for interest in user_profile['interests']:
-            if interest in career_data['keywords']:
+            if any(interest in keyword or keyword in interest for keyword in career_data['keywords']):
+                score += 5
+        
+        # Match skills (medium weight)
+        for skill in user_profile['skills']:
+            if any(skill in s or s in skill for s in career_data['skills']):
                 score += 3
         
-        # Match skills
-        for skill in user_profile['skills']:
-            if skill in career_data['skills']:
-                score += 2
-        
-        # Match personality
+        # Match personality (medium weight)
         for trait in user_profile['personality']:
-            if trait in career_data['personality']:
+            if any(trait in p or p in trait for p in career_data['personality']):
+                score += 3
+        
+        # Match subjects (low-medium weight)
+        for subject in user_profile['subjects']:
+            if any(subject in keyword or keyword in subject for keyword in career_data['keywords']):
                 score += 2
         
-        # Match subjects/hobbies
-        for item in user_profile['subjects'] + user_profile['hobbies']:
-            if item in career_data['keywords']:
+        # Match hobbies (low weight)
+        for hobby in user_profile['hobbies']:
+            if any(hobby in keyword or keyword in hobby for keyword in career_data['keywords']):
                 score += 1.5
         
-        scores[career_id] = score
+        # Penalty for dislikes
+        for dislike in user_profile['dislikes']:
+            if any(dislike in keyword or keyword in dislike for keyword in career_data['keywords']):
+                score -= 2
+        
+        scores[career_id] = max(score, 0)  # Don't allow negative scores
     
     # Sort by score
     sorted_careers = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     return sorted_careers
 
-# ==================== CONVERSATION FLOW ====================
-def get_next_question(session):
-    """Generate next question based on conversation stage"""
-    stage = session.current_stage
-    count = session.question_count
+def generate_natural_response(session, user_message, intent):
+    """Generate natural, context-aware responses"""
     
-    questions = {
-        "greeting": "Hello! I'm your AI Career Counsellor. I'm here to help you discover the perfect career path. What's your name?",
-        "interests": "That's a great name! Let's start exploring your interests. What subjects or activities do you enjoy the most?",
-        "skills": "Interesting! Now, what would you say are your strongest skills? (e.g., problem-solving, creativity, communication)",
-        "personality": "Great! How would you describe your personality? Are you more introverted or extroverted? Detail-oriented or big-picture thinker?",
-        "hobbies": "Tell me about your hobbies and what you like to do in your free time.",
-        "favorite_subjects": "Which academic subjects do you find most interesting or excel at?",
-        "work_preference": "Do you prefer working with people, working with technology/data, or working with creative/artistic tasks?",
-        "future_vision": "Where do you see yourself in 5-10 years? What kind of work environment appeals to you?",
-        "analyze": "Thank you for sharing! Let me analyze your responses and suggest the best career paths for you..."
-    }
+    # Update user profile based on message
+    keywords = extract_keywords_advanced(user_message)
+    entities = extract_entities(user_message)
     
-    stages_order = ["greeting", "interests", "skills", "personality", "hobbies", 
-                   "favorite_subjects", "work_preference", "future_vision", "analyze"]
+    # Add extracted entities to profile
+    session.user_profile['interests'].extend(keywords[:5])  # Limit to avoid too many
+    session.user_profile['subjects'].extend(entities['subjects'])
+    session.user_profile['skills'].extend(entities['skills'])
+    session.user_profile['hobbies'].extend(entities['hobbies'])
+    session.user_profile['personality'].extend(entities['personality'])
     
-    if stage in stages_order:
-        current_index = stages_order.index(stage)
-        if current_index < len(stages_order) - 1:
-            next_stage = stages_order[current_index + 1]
-            session.current_stage = next_stage
-            return questions.get(next_stage, "Tell me more about yourself.")
+    # Remove duplicates
+    for key in session.user_profile:
+        session.user_profile[key] = list(set(session.user_profile[key]))
     
-    return questions.get(stage, "Tell me more about your interests and goals.")
-
-def process_user_response(session, user_message):
-    """Process user response and update profile"""
-    keywords = extract_keywords(user_message)
-    sentiment = analyze_sentiment(user_message)
+    # Check if we have enough info
+    total_info = sum(len(v) for v in session.user_profile.values())
+    session.has_basic_info = total_info >= 5
     
-    stage = session.current_stage
+    # Response based on intent
+    if intent == 'greeting':
+        return "Hello! I'm here to help you explore career options. Tell me, what are you interested in? What subjects do you enjoy or what are you passionate about?"
     
-    # Extract relevant information based on stage
-    if stage == "interests":
-        session.user_profile['interests'].extend(keywords)
-    elif stage == "skills":
-        session.user_profile['skills'].extend(keywords)
-    elif stage == "personality":
-        session.user_profile['personality'].extend(keywords)
-    elif stage == "hobbies":
-        session.user_profile['hobbies'].extend(keywords)
-    elif stage == "favorite_subjects":
-        session.user_profile['subjects'].extend(keywords)
-    elif stage in ["work_preference", "future_vision"]:
-        session.user_profile['interests'].extend(keywords)
-        session.user_profile['personality'].extend(keywords)
+    elif intent == 'recommend':
+        if not session.has_basic_info:
+            return "I'd love to recommend careers! But first, tell me a bit more about yourself. What subjects do you like? What are you good at? What do you enjoy doing?"
+        
+        career_matches = calculate_career_match(session.user_profile)
+        top_careers = career_matches[:3]
+        
+        if top_careers[0][1] == 0:  # No matches
+            return "I need a bit more information to make good recommendations. What are your favorite subjects or activities?"
+        
+        response = "Based on what you've told me, here are some careers that might suit you:\n\n"
+        for i, (career_id, score) in enumerate(top_careers, 1):
+            if score > 0:
+                career = CAREER_DATABASE[career_id]
+                response += f"{i}. **{career['title']}** - {career['description']}\n"
+                response += f"   Salary: {career['salary_range']} | Growth: {career['growth']}\n\n"
+        
+        response += "Would you like to know more about any of these careers?"
+        session.context = 'recommendations_given'
+        return response
     
-    session.question_count += 1
-
-def generate_recommendations(session):
-    """Generate career recommendations"""
-    career_matches = calculate_career_match(session.user_profile)
+    elif intent == 'details':
+        # Check if asking about a specific career
+        for career_id, career_data in CAREER_DATABASE.items():
+            if career_data['title'].lower() in user_message.lower():
+                career = career_data
+                response = f"**{career['title']}**\n\n"
+                response += f"{career['description']}\n\n"
+                response += f"💰 Salary Range: {career['salary_range']}\n"
+                response += f"📈 Growth Potential: {career['growth']}\n"
+                response += f"📚 Recommended Courses: {', '.join(career['courses'][:3])}\n"
+                response += f"🎯 Key Skills: {', '.join(career['skills'][:3])}\n\n"
+                response += "Would you like to know about other career options?"
+                return response
+        
+        return "Which career would you like to know more about? Just mention the name!"
     
-    # Get top 3 careers
-    top_careers = career_matches[:3]
+    elif intent == 'sharing_interest':
+        if entities['subjects'] or entities['skills'] or entities['hobbies']:
+            return "That's great! " + (
+                f"So you're interested in {', '.join(entities['subjects'] + entities['skills'] + entities['hobbies'][:2])}. " if entities['subjects'] or entities['skills'] or entities['hobbies'] else ""
+            ) + "What else do you enjoy or excel at? Or would you like me to suggest some careers based on what I know so far?"
+        return "Interesting! Tell me more about what you like or what you're good at."
     
-    recommendations = []
-    for career_id, score in top_careers:
-        if score > 0:  # Only include careers with positive scores
-            career = CAREER_DATABASE[career_id]
-            recommendations.append({
-                "career_id": career_id,
-                "title": career['title'],
-                "description": career['description'],
-                "match_score": round(score, 2),
-                "courses": career['courses'],
-                "salary_range": career['salary_range'],
-                "growth_potential": career['growth']
-            })
+    elif intent == 'question':
+        # Try to answer general career questions
+        if 'salary' in user_message.lower() or 'pay' in user_message.lower():
+            return "Salaries vary by career, experience, and location. For example, Software Engineers typically earn ₹4-15 LPA, while Data Scientists can earn ₹6-20 LPA. Would you like salary information for a specific career?"
+        
+        if 'course' in user_message.lower() or 'study' in user_message.lower():
+            return "The courses you should take depend on your career goal. Tell me what career interests you, and I can suggest the right courses!"
+        
+        return "That's a good question! To help you better, tell me about your interests and what you enjoy doing, and I can suggest careers that align with them."
     
-    return recommendations
+    else:  # general intent
+        if not session.has_basic_info:
+            return "Thanks for sharing! To give you the best career suggestions, tell me more about what subjects you like, what you're good at, or what you enjoy doing in your free time."
+        else:
+            return "Got it! Would you like me to recommend some careers based on what you've told me? Or is there anything else you'd like to share?"
 
 # ==================== API ENDPOINTS ====================
 @chatbot_bp.route('/chat/start', methods=['POST'])
@@ -316,22 +418,20 @@ def generate_recommendations(session):
 def start_chat():
     """Initialize a new chat session"""
     try:
-        data = request.json
+        data = request.json or {}
         session_id = data.get('session_id') or f"session_{datetime.now().timestamp()}"
         
         # Create new session
         session = ChatSession(session_id)
         chat_sessions[session_id] = session
         
-        # Get greeting message
-        greeting = get_next_question(session)
+        greeting = "Hi! I'm your AI Career Guide. I'm here to help you discover careers that match your interests and skills. What subjects or activities do you enjoy?"
         session.add_message("bot", greeting)
         
         return jsonify({
             "success": True,
             "session_id": session_id,
-            "message": greeting,
-            "stage": session.current_stage
+            "message": greeting
         })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -339,7 +439,7 @@ def start_chat():
 @chatbot_bp.route('/chat/message', methods=['POST'])
 @cross_origin()
 def send_message():
-    """Handle user message and generate response"""
+    """Handle user message and generate intelligent response"""
     try:
         data = request.json
         session_id = data.get('session_id')
@@ -352,53 +452,44 @@ def send_message():
             return jsonify({"success": False, "error": "Message is empty"}), 400
         
         session = chat_sessions[session_id]
-        
-        # Add user message to history
         session.add_message("user", user_message)
         
-        # Process response and update profile
-        process_user_response(session, user_message)
+        # Detect intent and generate response
+        intent = detect_intent(user_message)
+        response = generate_natural_response(session, user_message, intent)
         
-        # Check if we should generate recommendations
-        if session.current_stage == "analyze" or session.question_count >= session.max_questions:
-            recommendations = generate_recommendations(session)
-            
-            if recommendations:
-                response = f"Based on our conversation, here are my top career recommendations for you:\n\n"
-                for i, rec in enumerate(recommendations, 1):
-                    response += f"{i}. **{rec['title']}** (Match: {rec['match_score']})\n"
-                    response += f"   {rec['description']}\n"
-                    response += f"   💰 Salary: {rec['salary_range']} | 📈 Growth: {rec['growth_potential']}\n"
-                    response += f"   📚 Recommended Courses: {', '.join(rec['courses'][:2])}\n\n"
-                
-                response += "\nWould you like more details about any of these careers, or would you prefer to connect with a human counsellor?"
-            else:
-                response = "I need a bit more information to provide accurate recommendations. Could you tell me more about what you're passionate about?"
-                session.current_stage = "interests"
-            
-            session.add_message("bot", response)
-            
-            return jsonify({
-                "success": True,
-                "message": response,
-                "recommendations": recommendations,
-                "stage": "recommendations",
-                "session_id": session_id
-            })
+        session.add_message("bot", response)
         
-        # Get next question
-        next_question = get_next_question(session)
-        session.add_message("bot", next_question)
+        # Generate recommendations if requested
+        recommendations = []
+        if intent == 'recommend' and session.has_basic_info:
+            career_matches = calculate_career_match(session.user_profile)
+            for career_id, score in career_matches[:3]:
+                if score > 0:
+                    career = CAREER_DATABASE[career_id]
+                    recommendations.append({
+                        "career_id": career_id,
+                        "title": career['title'],
+                        "description": career['description'],
+                        "match_score": round(score, 2),
+                        "courses": career['courses'],
+                        "salary_range": career['salary_range'],
+                        "growth_potential": career['growth']
+                    })
         
         return jsonify({
             "success": True,
-            "message": next_question,
-            "stage": session.current_stage,
+            "message": response,
             "session_id": session_id,
-            "progress": round((session.question_count / session.max_questions) * 100)
+            "intent": intent,
+            "has_basic_info": session.has_basic_info,
+            "recommendations": recommendations if recommendations else []
         })
         
     except Exception as e:
+        print(f"Error in send_message: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
 @chatbot_bp.route('/chat/history/<session_id>', methods=['GET'])
@@ -429,7 +520,6 @@ def end_chat(session_id):
             history = session.conversation_history
             profile = session.user_profile
             
-            # Remove from active sessions
             del chat_sessions[session_id]
             
             return jsonify({
@@ -463,4 +553,4 @@ def get_career_details(career_id):
 def init_chatbot(app):
     """Initialize chatbot with Flask app"""
     app.register_blueprint(chatbot_bp, url_prefix='/api')
-    print("✅ Chatbot module initialized")
+    print("✅ Improved chatbot module initialized")

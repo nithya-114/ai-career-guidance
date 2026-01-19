@@ -27,6 +27,19 @@ api.interceptors.request.use(
   }
 );
 
+// Response interceptor for better error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Token expired or invalid
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
 // ==================== AUTHENTICATION ====================
 
 export const authAPI = {
@@ -73,21 +86,21 @@ export const courseAPI = {
 export const counsellorAPI = {
   getAll: () => api.get('/counsellors'),
   getById: (id) => api.get(`/counsellors/${id}`),
+  getAvailability: (id, date) => api.get(`/counsellors/${id}/availability`, { 
+    params: { date } 
+  }),
 };
 
-// ==================== CHAT - FIXED ====================
+// ==================== CHAT ====================
 
 export const chatAPI = {
-  // FIXED: This should call /chat/send (the blueprint route)
   sendMessage: (data) => {
     console.log('Calling chat endpoint:', `${API_URL}/chat/send`);
     return api.post('/chat/send', data);
   },
   
-  // Get chat history
   getHistory: (sessionId) => api.get(`/chat/history/${sessionId}`),
   
-  // Clear chat session
   clearSession: (sessionId) => api.delete(`/chat/session/${sessionId}`),
 };
 
@@ -109,17 +122,30 @@ export const quizAPI = {
 
 export const appointmentAPI = {
   create: (data) => api.post('/appointments', data),
-  getAll: () => api.get('/appointments'),
+  getAll: (params) => api.get('/appointments', { params }),
   getById: (id) => api.get(`/appointments/${id}`),
-  update: (id, data) => api.put(`/appointments/${id}`, data),
-  cancel: (id) => api.delete(`/appointments/${id}`),
+  cancel: (id) => api.put(`/appointments/${id}/cancel`),
+  complete: (id, data) => api.put(`/appointments/${id}/complete`, data),
+  rate: (id, data) => api.post(`/appointments/${id}/rate`, data),
 };
 
-// ==================== PAYMENT ====================
+// ==================== PAYMENT - FIXED ====================
 
 export const paymentAPI = {
-  createOrder: (data) => api.post('/payment/create-order', data),
-  verifyPayment: (data) => api.post('/payment/verify', data),
+  createOrder: (data) => {
+    console.log('Creating payment order:', data);
+    return api.post('/payment/create-order', data);
+  },
+  
+  // FIXED: Changed from /payment/verify to /payment/verify-payment
+  verifyPayment: (data) => {
+    console.log('Verifying payment:', data);
+    return api.post('/payment/verify-payment', data);
+  },
+  
+  getPaymentStatus: (orderId) => api.get(`/payment/payment-status/${orderId}`),
+  
+  getMyBookings: () => api.get('/payment/my-bookings'),
 };
 
 // ==================== HEALTH CHECK ====================

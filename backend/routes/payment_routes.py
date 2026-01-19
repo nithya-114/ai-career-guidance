@@ -5,37 +5,52 @@ import razorpay
 import hmac
 import hashlib
 import os
+import jwt
 
 payment_bp = Blueprint('payment', __name__)
 
 # Initialize Razorpay client
 razorpay_client = razorpay.Client(
     auth=(
-        os.getenv('RAZORPAY_KEY_ID'),
-        os.getenv('RAZORPAY_KEY_SECRET')
+        os.getenv('RAZORPAY_KEY_ID', 'rzp_test_your_key_here'),
+        os.getenv('RAZORPAY_KEY_SECRET', 'your_secret_here')
     )
 )
 
 
-@payment_bp.route('/create-order', methods=['POST', 'OPTIONS'])
-def create_order():
-    """
-    Create Razorpay order for counsellor booking
-    POST /api/payment/create-order
-    Body: {
-        "counsellor_id": "...",
-        "date": "2026-01-20",
-        "time": "10:00",
-        "duration": 1,  # hours
-        "amount": 500
-    }
-    """
-    if request.method == 'OPTIONS':
-        return '', 200
+def get_user_from_token(request):
+    """Extract user ID from JWT token"""
+    auth_header = request.headers.get('Authorization')
     
+    if not auth_header or not auth_header.startswith('Bearer '):
+        return None, {'error': 'No token provided'}, 401
+    
+    token = auth_header.split(' ')[1]
+    
+    try:
+        payload = jwt.decode(
+            token,
+            current_app.config['SECRET_KEY'],
+            algorithms=['HS256']
+        )
+        return payload['user_id'], None, None
+    except jwt.ExpiredSignatureError:
+        return None, {'error': 'Token expired'}, 401
+    except:
+        return None, {'error': 'Invalid token'}, 401
+
+
+@payment_bp.route('/create-order', methods=['POST'])
+def create_order():
+    """Create Razorpay order"""
     try:
         db = current_app.config['DB']
         data = request.json
+        
+        # Get user from token
+        user_id, error, status = get_user_from_token(request)
+        if error:
+            return jsonify(error), status
         
         # Validate required fields
         required = ['counsellor_id', 'date', 'time', 'duration', 'amount']
@@ -52,7 +67,7 @@ def create_order():
         if not counsellor:
             return jsonify({'error': 'Counsellor not found'}), 404
         
-        # Calculate amount (in paise - Razorpay uses smallest currency unit)
+        # Calculate amount in paise (Razorpay uses smallest currency unit)
         amount_inr = int(data['amount'])
         amount_paise = amount_inr * 100
         
@@ -60,13 +75,14 @@ def create_order():
         razorpay_order = razorpay_client.order.create({
             'amount': amount_paise,
             'currency': 'INR',
-            'payment_capture': 1,  # Auto capture
+            'payment_capture': 1,
             'notes': {
                 'counsellor_id': data['counsellor_id'],
                 'counsellor_name': counsellor['name'],
+                'student_id': str(user_id),
                 'date': data['date'],
                 'time': data['time'],
-                'duration': data['duration']
+                'duration': str(data['duration'])
             }
         })
         
@@ -75,7 +91,7 @@ def create_order():
             'razorpay_order_id': razorpay_order['id'],
             'counsellor_id': ObjectId(data['counsellor_id']),
             'counsellor_name': counsellor['name'],
-            'student_id': ObjectId(data.get('student_id')) if data.get('student_id') else None,
+            'student_id': ObjectId(user_id),
             'date': data['date'],
             'time': data['time'],
             'duration': data['duration'],
@@ -87,6 +103,8 @@ def create_order():
         
         db.payment_orders.insert_one(order_doc)
         
+        print(f"✅ Order created: {razorpay_order['id']}")
+        
         return jsonify({
             'order_id': razorpay_order['id'],
             'amount': amount_paise,
@@ -96,28 +114,24 @@ def create_order():
         
     except Exception as e:
         print(f"❌ Create order error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 
-@payment_bp.route('/verify-payment', methods=['POST', 'OPTIONS'])
+@payment_bp.route('/verify-payment', methods=['POST'])
 def verify_payment():
-    """
-    Verify Razorpay payment signature
-    POST /api/payment/verify-payment
-    Body: {
-        "razorpay_order_id": "...",
-        "razorpay_payment_id": "...",
-        "razorpay_signature": "..."
-    }
-    """
-    if request.method == 'OPTIONS':
-        return '', 200
-    
+    """Verify Razorpay payment signature"""
     try:
         db = current_app.config['DB']
         data = request.json
         
-        # Get required fields
+        # Get user from token
+        user_id, error, status = get_user_from_token(request)
+        if error:
+            return jsonify(error), status
+        
+        # Get payment details
         order_id = data.get('razorpay_order_id')
         payment_id = data.get('razorpay_payment_id')
         signature = data.get('razorpay_signature')
@@ -126,30 +140,25 @@ def verify_payment():
             return jsonify({'error': 'Missing payment details'}), 400
         
         # Verify signature
-        try:
-            # Create signature string
-            message = f"{order_id}|{payment_id}"
-            
-            # Generate signature
-            generated_signature = hmac.new(
-                os.getenv('RAZORPAY_KEY_SECRET').encode('utf-8'),
-                message.encode('utf-8'),
-                hashlib.sha256
-            ).hexdigest()
-            
-            # Compare signatures
-            if generated_signature != signature:
-                return jsonify({'error': 'Invalid payment signature'}), 400
-            
-        except Exception as e:
-            print(f"❌ Signature verification error: {e}")
-            return jsonify({'error': 'Payment verification failed'}), 400
+        message = f"{order_id}|{payment_id}"
+        generated_signature = hmac.new(
+            os.getenv('RAZORPAY_KEY_SECRET').encode('utf-8'),
+            message.encode('utf-8'),
+            hashlib.sha256
+        ).hexdigest()
         
-        # Payment is valid - update order
+        if generated_signature != signature:
+            return jsonify({'error': 'Invalid payment signature'}), 400
+        
+        # Get order
         order = db.payment_orders.find_one({'razorpay_order_id': order_id})
         
         if not order:
             return jsonify({'error': 'Order not found'}), 404
+        
+        # Verify user owns this order
+        if str(order['student_id']) != str(user_id):
+            return jsonify({'error': 'Unauthorized'}), 403
         
         # Update order status
         db.payment_orders.update_one(
@@ -169,18 +178,27 @@ def verify_payment():
             'student_id': order['student_id'],
             'counsellor_id': order['counsellor_id'],
             'counsellor_name': order['counsellor_name'],
-            'date': order['date'],
-            'time': order['time'],
-            'duration': order['duration'],
-            'amount_paid': order['amount'],
+            'appointment_date': datetime.strptime(
+                f"{order['date']} {order['time']}", 
+                '%Y-%m-%d %H:%M'
+            ),
+            'duration': int(order['duration']) * 60,  # Convert to minutes
+            'status': 'scheduled',
+            'meeting_link': None,
+            'notes': '',
+            'rating': None,
+            'feedback': None,
+            'payment_status': 'paid',
+            'payment_amount': float(order['amount']),
             'payment_id': payment_id,
             'order_id': order_id,
-            'status': 'scheduled',
             'created_at': datetime.utcnow(),
-            'notes': ''
+            'updated_at': datetime.utcnow()
         }
         
         result = db.appointments.insert_one(appointment)
+        
+        print(f"✅ Payment verified and appointment created: {result.inserted_id}")
         
         return jsonify({
             'success': True,
@@ -190,69 +208,40 @@ def verify_payment():
         
     except Exception as e:
         print(f"❌ Verify payment error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 
-@payment_bp.route('/payment-status/<order_id>', methods=['GET', 'OPTIONS'])
-def payment_status(order_id):
-    """
-    Check payment status
-    GET /api/payment/payment-status/<order_id>
-    """
-    if request.method == 'OPTIONS':
-        return '', 200
-    
-    try:
-        db = current_app.config['DB']
-        
-        order = db.payment_orders.find_one({'razorpay_order_id': order_id})
-        
-        if not order:
-            return jsonify({'error': 'Order not found'}), 404
-        
-        order['_id'] = str(order['_id'])
-        if 'counsellor_id' in order:
-            order['counsellor_id'] = str(order['counsellor_id'])
-        if 'student_id' in order:
-            order['student_id'] = str(order['student_id'])
-        
-        return jsonify(order), 200
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@payment_bp.route('/my-bookings', methods=['GET', 'OPTIONS'])
+@payment_bp.route('/my-bookings', methods=['GET'])
 def my_bookings():
-    """
-    Get user's bookings (requires authentication)
-    GET /api/payment/my-bookings
-    Headers: Authorization: Bearer <token>
-    """
-    if request.method == 'OPTIONS':
-        return '', 200
-    
+    """Get user's bookings"""
     try:
         db = current_app.config['DB']
         
-        # Get user from token (implement your auth logic)
-        # user_id = get_user_from_token()
-        
-        # For now, get from query param
-        user_id = request.args.get('user_id')
-        
-        if not user_id:
-            return jsonify({'error': 'User ID required'}), 400
+        # Get user from token
+        user_id, error, status = get_user_from_token(request)
+        if error:
+            return jsonify(error), status
         
         # Get appointments
-        appointments = list(db.appointments.find({'student_id': ObjectId(user_id)}))
+        appointments = list(db.appointments.find({
+            'student_id': ObjectId(user_id)
+        }).sort('created_at', -1))
         
+        # Format response
         for apt in appointments:
             apt['_id'] = str(apt['_id'])
             apt['student_id'] = str(apt['student_id'])
             apt['counsellor_id'] = str(apt['counsellor_id'])
+            
+            if isinstance(apt.get('appointment_date'), datetime):
+                apt['appointment_date'] = apt['appointment_date'].isoformat()
+            if isinstance(apt.get('created_at'), datetime):
+                apt['created_at'] = apt['created_at'].isoformat()
         
         return jsonify({'appointments': appointments}), 200
         
     except Exception as e:
+        print(f"❌ My bookings error: {str(e)}")
         return jsonify({'error': str(e)}), 500
